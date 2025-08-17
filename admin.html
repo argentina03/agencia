@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Administrador - CLAU712</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #121212;
+      color: white;
+      display: flex;
+    }
+    aside {
+      width: 220px;
+      background: #1f1f1f;
+      height: 100vh;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    aside h2 {
+      margin-top: 0;
+      color: #00ffcc;
+      font-size: 22px;
+      text-align: center;
+    }
+    aside button {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      background: #2c2c2c;
+      border: none;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      border-left: 5px solid transparent;
+      text-align: left;
+    }
+    aside button:hover {
+      background: #333;
+      border-left: 5px solid #00ffcc;
+    }
+    main {
+      flex-grow: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .tabla-sorteos-admin {
+      border-collapse: collapse;
+      width: 100%;
+      background: #1e1e1e;
+    }
+    .tabla-sorteos-admin th, .tabla-sorteos-admin td {
+      border: 1px solid #333;
+      padding: 8px;
+      text-align: center;
+    }
+    .casilla-sorteo {
+      width: 30px;
+      height: 30px;
+      background: #333;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-block;
+    }
+    .casilla-sorteo.activo {
+      background: #00ffcc;
+    }
+    .jugada-inputs input, .jugada-inputs select {
+      padding: 10px;
+      margin: 5px;
+      font-size: 16px;
+      width: 90px;
+      background: #222;
+      border: 1px solid #444;
+      color: white;
+      border-radius: 5px;
+    }
+    .jugada-inputs button {
+      font-size: 20px;
+      padding: 8px;
+    }
+    .tabla-jugadas {
+      width: 100%;
+      background: #1e1e1e;
+      border-collapse: collapse;
+    }
+    .tabla-jugadas th, .tabla-jugadas td {
+      padding: 8px;
+      text-align: center;
+      border: 1px solid #333;
+    }
+    #ticketPreview {
+      margin-top: 20px;
+      padding: 10px;
+      background: #111;
+      border: 1px solid #444;
+      border-radius: 5px;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <aside>
+    <h2>CLAU712 🛠</h2>
+    <button class="btn-solapa" data-seccion="carga">📥 Carga de Jugadas</button>
+    <button class="btn-solapa" data-seccion="enviadas">📄 Jugadas Enviadas</button>
+    <button class="btn-solapa" data-seccion="resultados">🎯 Resultados</button>
+    <button class="btn-solapa" data-seccion="liquidaciones">💰 Liquidaciones</button>
+    <button class="btn-solapa" data-seccion="editar">⚙️ Editar Sistema</button>
+    <button class="btn-solapa" data-seccion="control">📈 Control</button>
+    <button class="btn-solapa" data-seccion="administradores">👤 Administradores</button>
+    <button class="btn-solapa" data-seccion="usuarios">👥 Usuarios</button>
+    <button onclick="window.location.href='index.html'">🔒 Cerrar Sesión</button>
+  </aside>
+
+  <main id="zonaContenido">
+    <section id="inicio">
+      <h1>Bienvenido al Panel de Administrador</h1>
+      <p>Seleccioná una opción del menú para comenzar.</p>
+    </section>
+  
+    <section id="resultados" style="display:none">
+      <div style="background:#111; padding:30px; border-radius:10px; max-width:500px; margin:auto">
+        <h2 style="color:white; text-align:center">📋 Cargar Resultado Manual</h2>
+        <label style="color:#aaa">Fecha:</label>
+        <input type="date" id="res-fecha" style="width:100%; padding:8px; margin-bottom:10px"><br>
+  
+        <label style="color:#aaa">Lotería (ej: PRO10):</label>
+        <input type="text" id="res-loteria" placeholder="PRO10" style="width:100%; padding:8px; margin-bottom:10px"><br>
+  
+        <label style="color:#aaa">20 Números (uno por línea):</label>
+        <textarea id="res-numeros" rows="10" style="width:100%; padding:8px; font-family:monospace"></textarea><br>
+  
+        <button onclick="subirResultadoManual()" style="margin-top:10px; padding:10px 20px; background:#0a0; color:white; border:none; font-size:16px">
+          💾 Guardar Resultado
+        </button>
+      </div>
+    </section>
+  
+    <section id="editar" style="display:none">
+      <div style="max-width:480px; margin:30px auto; background:#111; padding:30px; border-radius:12px; box-shadow: 0 0 12px rgba(0,0,0,0.6)">
+        <h2 style="color:white; text-align:center">🔐 Cambiar Contraseña</h2>
+  
+        <div style="margin-bottom:20px">
+          <label style="color:#ccc; font-weight:bold; display:block; margin-bottom:6px;">Contraseña actual:</label>
+          <input type="password" id="claveActual" placeholder="Contraseña actual" style="width:100%; padding:12px; background:#222; color:white; border:1px solid #555; border-radius:6px; font-size:16px">
+        </div>
+  
+        <div style="margin-bottom:20px">
+          <label style="color:#ccc; font-weight:bold; display:block; margin-bottom:6px;">Nueva contraseña:</label>
+          <input type="password" id="claveNueva1" placeholder="Nueva contraseña" style="width:100%; padding:12px; background:#222; color:white; border:1px solid #555; border-radius:6px; font-size:16px">
+        </div>
+  
+        <div style="margin-bottom:20px">
+          <label style="color:#ccc; font-weight:bold; display:block; margin-bottom:6px;">Repetir nueva contraseña:</label>
+          <input type="password" id="claveNueva2" placeholder="Repetí la nueva contraseña" style="width:100%; padding:12px; background:#222; color:white; border:1px solid #555; border-radius:6px; font-size:16px">
+        </div>
+  
+        <div style="text-align:center">
+          <button onclick="cambiarContrasena()" style="padding:12px 24px; font-size:16px; font-weight:bold; background-color:#2ecc71; color:white; border:none; border-radius:6px; cursor:pointer">💾 Cambiar Contraseña</button>
+          <p id="mensajeClave" style="margin-top:15px; font-weight:bold;"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="liquidaciones" style="display:none">
+      <h2>💰 LIQUIDACIONES</h2>
+      <p>Subí la liquidación para todos los pasadores. Si ya existía, será reemplazada.</p>
+      <label for="fechaLiquidacion">📅 Fecha de liquidación:</label>
+      <input type="date" id="fechaLiquidacion" style="padding:10px;font-size:14px;display:block;margin:10px 0;">
+      <button onclick="subirLiquidacionesManuales()" style="padding:10px 20px;font-size:16px;cursor:pointer">
+        📩 Subir Liquidaciones a Supabase
+      </button>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>  
+  <script src="admin.js"></script>
+</body>
+</html>

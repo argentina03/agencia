@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <meta charset="UTF-8">
+  <title>Login - Clau712</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="login-body">
+  <div class="login-container">
+    <h1>CLAU712</h1>
+    <input type="text" id="usuario" placeholder="Usuario" autofocus>
+<input type="password" id="clave" placeholder="Contraseña">
+    <button onclick="login()">Ingresar</button>
+    <p id="mensajeError" class="error-msg"></p>
+  </div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>  
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

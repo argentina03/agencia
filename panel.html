@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>CLAU712</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://kit.fontawesome.com/a67d08e98b.js" crossorigin="anonymous"></script>
+</head>
+<body class="panel-body">
+  <div class="sidebar">
+    <h2>CLAU712</h2>
+    <button onclick="mostrarSeccion('jugadas')">Carga de Jugadas</button>
+    <button onclick="mostrarSeccion('enviadas')">Jugadas Enviadas</button>
+    <button onclick="mostrarSeccion('resultados')">Resultados</button>
+    <button onclick="mostrarSeccion('liquidaciones')">Liquidaciones</button>
+    <button onclick="mostrarSeccion('perfil')">Editar Perfil</button>
+    <button onclick="cerrarSesion()">Cerrar Sesión</button>
+  </div>
+
+  <main class="contenido" id="contenidoPrincipal">
+    <h1>Bienvenido a CLAU712</h1>
+    <p style="color:#888; text-align:center; margin-top:20px;">Seleccioná una opción del menú para comenzar.</p>
+  </main>
+
+  <!-- Sección de Resultados que se mostrará al hacer clic en el botón -->
+  <div id="resultados-section" style="display:none;">
+    <!-- Aquí va el código que te proporcioné -->
+    <div style="text-align: center; margin-bottom: 20px;">
+      <input type="date" id="buscarFecha" style="padding: 10px; font-size: 14px;">
+      <button style="font-size: 18px; padding: 8px 20px; margin: 6px;" onclick="buscarResultados()">Buscar</button>
+    </div>
+
+    <h2 style="text-align: center; color: white; background-color: #333; padding: 10px;">ACIERTOS DE JUGADAS</h2>
+
+    <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+      <thead>
+        <tr>
+          <th style="padding: 10px; text-align: left; color: white; background-color: #222;">Ticket</th>
+          <th style="padding: 10px; text-align: left; color: white; background-color: #222;">Loterías</th>
+          <th style="padding: 10px; text-align: left; color: white; background-color: #222;">Número</th>
+          <th style="padding: 10px; text-align: left; color: white; background-color: #222;">Posición</th>
+          <th style="padding: 10px; text-align: left; color: white; background-color: #222;">Número R</th>
+          <th style="padding: 10px; text-align: left; color: white; background-color: #222;">Posición R</th>
+          <th style="padding: 10px; text-align: left; color: white; background-color: #222;">Importe</th>
+          <th style="padding: 10px; text-align: left; color: white; background-color: #222;">Acierto</th>
+        </tr>
+      </thead>
+      <tbody id="tablaAciertos">
+        <!-- Aquí se llenarán las filas con los aciertos -->
+      </tbody>
+    </table>
+
+    <h3 style="text-align: center; color: white; margin-top: 20px;">Comparación de Loterías</h3>
+    <table style="width: 100%; margin-top: 10px;">
+      <thead>
+        <tr>
+          <th style="padding: 10px; background-color: #222; color: white;">Letra</th>
+          <th style="padding: 10px; background-color: #222; color: white;">Lotería</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>A</td>
+          <td>Nacional</td>
+        </tr>
+        <tr>
+          <td>B</td>
+          <td>Provincia</td>
+        </tr>
+        <!-- Agregar más loterías -->
+      </tbody>
+    </table>
+
+    <div style="margin-top: 20px; text-align: center;">
+      <input type="number" id="ticketNumero" placeholder="Número de ticket" style="padding: 8px; font-size: 14px;">
+      <button onclick="verificarPremio()" style="padding: 8px 20px;">Verificar Premio</button>
+      <p id="resultadoPremio" style="color: #ff9900;"></p>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>  
+  <script src="main.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</body>
+</html>
