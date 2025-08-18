@@ -3720,53 +3720,55 @@ function desactivarDividirMonto() {
   document.addEventListener('DOMContentLoaded', wireFiltro);
   new MutationObserver(wireFiltro).observe(document.documentElement, { childList:true, subtree:true });
 })();
-// === Mobile Tabs (clona .tabs al drawer inferior y agrega botón ☰) ===
-(function () {
-  // no molestar en pantallas grandes
+// ===== MOBILE TABS: idempotente, una sola vez =====
+(function initMobileTabs(){
+  if (window.__MOBILE_TABS_WIRED__) return;
+  window.__MOBILE_TABS_WIRED__ = true;
+
+  // Solo en pantallas chicas
   if (window.matchMedia('(min-width: 901px)').matches) return;
 
-  // ¿hay solapas declaradas?
-  var tabs = document.querySelector('.tabs');
+  const tabs = document.querySelector('.tabs');
   if (!tabs) return;
 
-  // botón hamburguesa fijo arriba
+  // Botón hamburguesa (si no existe)
   if (!document.getElementById('hamb-btn')) {
-    var btn = document.createElement('button');
+    const btn = document.createElement('button');
     btn.id = 'hamb-btn';
     btn.className = 'hamb';
     btn.innerHTML = '<span></span>';
     btn.title = 'Menú';
-    btn.onclick = function () { document.body.classList.toggle('nav-open'); };
+    btn.addEventListener('click', ()=> document.body.classList.toggle('nav-open'));
     document.body.appendChild(btn);
   }
 
-  // cajón inferior
+  // Drawer inferior (si no existe)
   if (!document.getElementById('mobileTabs')) {
-    var panel = document.createElement('div');
+    const panel = document.createElement('div');
     panel.id = 'mobileTabs';
     panel.className = 'mobile-tabs';
     panel.innerHTML = '<div class="mt-content"></div>';
     document.body.appendChild(panel);
   }
 
-  // clonar botones/links de la barra original
-  var mt = document.querySelector('#mobileTabs .mt-content');
+  // Clonar items de la barra original
+  const mt = document.querySelector('#mobileTabs .mt-content');
   if (!mt) return;
-
-  // limpiar por si se re-ejecuta
   mt.innerHTML = '';
 
-  // prioridades: button, a, .btn-solapa, li>button
-  var items = tabs.querySelectorAll('button, a, .btn-solapa, li > button');
-  items.forEach(function (el, idx) {
-    // hacemos un clon visual que al click dispara el original
-    var b = document.createElement('button');
+  const items = tabs.querySelectorAll('button, a, .btn-solapa, li > button');
+  items.forEach((el, idx) => {
+    const b = document.createElement('button');
     b.className = 'mt-btn';
-    b.textContent = (el.textContent || el.innerText || '').trim() || ('Opción ' + (idx + 1));
-    b.addEventListener('click', function () {
-      try { el.click(); } catch (_) {}
+    b.textContent = (el.textContent || el.innerText || '').trim() || ('Opción ' + (idx+1));
+    b.addEventListener('click', () => {
+      try { el.click(); } catch {}
       document.body.classList.remove('nav-open'); // cerrar cajón
+      document.body.classList.add('tab-selected'); // ocultar barra original
     });
     mt.appendChild(b);
   });
+
+  // Al cargar en mobile, marcá como “seleccionado” si ya estás en alguna solapa
+  document.body.classList.add('tab-selected');
 })();

@@ -1843,3 +1843,69 @@ td,th{ padding:8px 10px; white-space:nowrap; }
   :root{ --ui-scale: 1 !important; }
   #content, .content { padding: 12px; }
 }
+/* ===== MOBILE PRO OVERHAUL ===== */
+@media (max-width: 900px){
+  /* Contenedor principal cómodo y sin zoom raro */
+  #content, .content{
+    transform:none !important;
+    width:100% !important;
+    max-width:none !important;
+    padding:12px 12px 72px; /* deja espacio para el drawer */
+    box-sizing:border-box;
+  }
+
+  /* Barra de solapas (la original) visible al entrar, se oculta tras elegir */
+  .tabs{
+    display:flex !important; gap:8px; flex-wrap:wrap; margin:8px 0 12px;
+  }
+  .tabs a, .tabs button{
+    flex:1 1 calc(50% - 8px);
+    background:#1b1b1b; border:1px solid #333; color:#ddd;
+    padding:10px; border-radius:10px; text-align:center; font-size:14px;
+  }
+  body.tab-selected .tabs{ display:none !important; } /* ocultar después de elegir */
+
+  /* Botón hamburguesa */
+  .hamb{
+    position:fixed; right:12px; top:12px; z-index:2100;
+    width:48px; height:48px; border-radius:12px;
+    background:#222; color:#ddd; border:1px solid #444;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+  }
+  .hamb span{ width:22px; height:2px; background:currentColor; position:relative; display:block; }
+  .hamb span::before,.hamb span::after{
+    content:""; position:absolute; left:0; width:22px; height:2px; background:currentColor;
+  }
+  .hamb span::before{ top:-6px } .hamb span::after{ top:6px }
+
+  /* Drawer inferior con las solapas clonadas */
+  .mobile-tabs{
+    position:fixed; left:0; right:0; bottom:0; z-index:2050;
+    transform:translateY(110%); transition:transform .25s ease;
+    background:#0f0f0f; border-top:1px solid #2a2a2a; padding:12px;
+    box-shadow:0 -18px 34px rgba(0,0,0,.45);
+  }
+  body.nav-open .mobile-tabs{ transform:translateY(0); }
+
+  .mobile-tabs .mt-content{
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px;
+  }
+  .mobile-tabs .mt-btn{
+    background:#1c1c1c; border:1px solid #303030; color:#eaeaea;
+    border-radius:10px; padding:12px 10px; font-size:15px; font-weight:600;
+  }
+
+  /* Tablas anchas: scroll horizontal suave, tipografía pareja */
+  .table-wrap, .grid-sorteos, #gridSorteos, .tabla-sorteos-admin, .tabla-resultados-admin{
+    overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:8px;
+  }
+  table{ min-width:640px; }
+
+  /* Ticket/Liquidación más nítidos en cel */
+  .ticket-preview, .liq-preview, .liquidacion-ticket{
+    font-size:13px; line-height:1.35;
+    border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.25);
+    padding:12px;
+  }
+}
