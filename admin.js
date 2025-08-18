@@ -1574,26 +1574,35 @@ async function cargarGrillaSorteosAdmin(){
     bHora.dataset.hora = hora;
     tdHora.appendChild(bHora);
     tr.appendChild(tdHora);
-
+    const isEnterKey = (e) => e.code === 'Enter' || e.code === 'NumpadEnter';
     // Celdas por sigla
-    orden.forEach(sig=>{
-      const td = document.createElement('td');
-      if ((bySig[sig]||[]).includes(hora)){
-        td.className = 'casilla-sorteo-admin';
-        td.dataset.lot = sig;
-        td.dataset.horario = hora;
-        td.tabIndex = 0; // accesible con teclado
+orden.forEach(sig=>{
+  const td = document.createElement('td');
+  if ((bySig[sig]||[]).includes(hora)){
+    td.className = 'casilla-sorteo-admin';
+    td.dataset.lot = sig;
+    td.dataset.horario = hora;
+    td.tabIndex = 0; // accesible con teclado
 
-        const toggle = ()=> td.classList.toggle('activo');
-        td.addEventListener('click', toggle);
-        td.addEventListener('keydown', e=>{
-          if (e.code==='Space' || e.key===' ') { e.preventDefault(); toggle(); }
-        });
-      } else {
-        td.className = 'no-disponible';
+    const toggle = ()=> td.classList.toggle('activo');
+    td.addEventListener('click', toggle);
+    td.addEventListener('keydown', (e) => {
+      // ⛔️ Bloquear Enter/NumpadEnter para que NO “desmarque” la celda
+      if (isEnterKey(e)) {
+        e.preventDefault();
+        return;
       }
-      tr.appendChild(td);
+      // ✅ Espacio sigue toggling
+      if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault();
+        toggle();
+      }
     });
+  } else {
+    td.className = 'no-disponible';
+  }
+  tr.appendChild(td);
+});
 
     cuerpo.appendChild(tr);
   });
@@ -1628,6 +1637,7 @@ async function cargarGrillaSorteosAdmin(){
 (function(){
   const get = (id)=> document.getElementById(id);
   const isInput = el => el && el.tagName === 'INPUT';
+  const isEnterKey = (e) => e.code === 'Enter' || e.code === 'NumpadEnter'; // ← AÑADIR
 
   function getInputs(){
     return [get('numAdmin'), get('posAdmin'), get('impAdmin'), get('numrAdmin'), get('posrAdmin')].filter(Boolean);
@@ -1750,8 +1760,8 @@ if (plusKeyDown){
       }
     }
 
-    // Enter → navegación inteligente
-    if (e.code === 'Enter'){
+    // Enter (normal o numérico) → navegación inteligente
+if (isEnterKey(e)){
       const now = Date.now();
 
       if (!isInput(focused)){

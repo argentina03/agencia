@@ -122,6 +122,14 @@ if (rol !== 'vendedor') {
   window.location.href = 'admin.html'; 
   return; 
 }
+
+// 🍔 Botón hamburguesa para mobile
+if (window.matchMedia('(max-width: 900px)').matches) {
+  const btnHamb = document.createElement('button');
+  btnHamb.className = 'mobi-tabs-btn';
+  btnHamb.innerHTML = '<span></span>';
+  document.body.appendChild(btnHamb);
+}
 // 🔄 Revalidar bloqueo desde la nube
 (async () => {
   try {
@@ -1217,6 +1225,10 @@ case 'perfil':
     default:
       contenido.innerHTML = `<h1>Bienvenido a CLAU712</h1>`;
   }
+  // 👇 Al final de la función (afuera del switch)
+  if (window.matchMedia('(max-width: 900px)').matches) {
+    document.body.classList.add('tab-selected'); 
+  }
 }
   // Cachea bloqueos por 2 minutos para evitar flasheo visual
 async function getBloqueosSetCached(fecha = hoyISO()) {
@@ -2242,15 +2254,17 @@ function cerrarSesion() {
 document.addEventListener('keydown', (e) => {
     const focused = document.activeElement;
     const activeTag = focused?.tagName;
+    // helper para detectar enter normal y numérico
+const isEnterKey = (e) => e.code === 'Enter' || e.code === 'NumpadEnter';
 
     // ❌ SOLO EVITA DESMARCAR SI FUE MARCADO CON EL MOUSE (no bloquea el doble enter)
     if (
-      e.code === 'Enter' &&
+      isEnterKey(e) &&
       (
         document.activeElement.classList.contains('opcion-loteria') ||
         document.activeElement.classList.contains('opcion-horario')
       )
-    ) {
+    ){
       e.preventDefault(); // evita desmarcado
       // simula Tab: enfoca el siguiente input (número o importe)
       const inputs = document.querySelectorAll('.jugada-inputs input');
@@ -2397,8 +2411,8 @@ Object.freeze(nuevaJugada.loterias);
       return;
     }
   
-    // ENTER = salto entre campos o doble enter para arrancar desde grilla
-if (e.code === 'Enter') {
+    // ENTER (normal o numérico) = salto entre campos o doble enter para arrancar desde grilla
+if (isEnterKey(e)) {
     const now = Date.now();
     const inputs = document.querySelectorAll('.jugada-inputs input');
   
