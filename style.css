@@ -1349,64 +1349,152 @@ hr {
   border-collapse: collapse;
   padding: 6px 10px; /* ⬅️ esto agrega espacio interno */
 }
-/* ======= MODO MOBILE (no toca escritorio) ======= */
-@media (max-width: 900px) {
-  html, body {
-    overflow-x: hidden;
-  }
+/* ===== Escala fluida para cualquier pantalla ===== */
+:root{
+  --ui-scale: 1;
+  --content-max: 1200px;        /* ancho cómodo desktop */
+  --fs-base: clamp(14px, 1vw + 12px, 18px);
+}
+html,body{ font-size: var(--fs-base); }
 
-  /* Layout general */
-  .contenido { padding: 12px; }
-  .seccion, .panel, .card { margin: 8px 0; }
+@media (min-width:1366px){ :root{ --ui-scale:.95 } }
+@media (min-width:1536px){ :root{ --ui-scale:.90 } }
+@media (min-width:1920px){ :root{ --ui-scale:.85 } }
+@media (min-width:2400px){ :root{ --ui-scale:.80 } }
 
-  /* Sidebar como barra horizontal scrolleable */
-  .sidebar {
-    position: static; width: 100%;
-    display: flex; align-items: center; gap: 10px;
-    overflow-x: auto; white-space: nowrap; padding: 8px 12px;
-  }
-  .sidebar .menu, .sidebar ul { 
-    display: flex; gap: 8px; flex-wrap: nowrap;
-  }
-  .sidebar .menu li, .sidebar a { 
-    flex: 0 0 auto;
-  }
-
-  /* Tablas y grillas */
-  .tabla, table {
-    width: 100%;
-    display: block;              /* permite scroll horizontal si hace falta */
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  table th, table td { padding: 6px 8px; font-size: 14px; }
-
-  /* Selección de sorteos / horarios */
-  .grid-sorteos { gap: 6px; overflow-x: auto; }
-  .casilla-sorteo { padding: 6px 8px; font-size: 14px; }
-
-  /* Inputs y botones cómodos en dedo */
-  input, select, textarea, button { font-size: 16px; } /* evita zoom en iOS */
-  .btn-enviar, .btn, button {
-    min-height: 44px; width: 100%;
-  }
-
-  /* Ticket */
-  .ticket-preview {
-    width: 100%; max-width: 360px; margin: 0 auto;
-    padding: 16px;
-  }
-
-  /* Login */
-  .login-container {
-    width: min(92vw, 360px);
-    padding: 16px;
-  }
+/* Se aplica a tu contenedor principal (ver PASO 2) */
+#content, .content{
+  transform: scale(var(--ui-scale));
+  transform-origin: top left;
+  width: calc(100% / var(--ui-scale));
+  min-height: calc(100vh / var(--ui-scale));
+  box-sizing: border-box;
+  padding: 16px;
+  margin: 0 auto;
+  max-width: calc(var(--content-max) / var(--ui-scale));
 }
 
-@media (max-width: 600px) {
-  /* Ajustes más compactos para teléfonos chicos */
-  h1, h2, h3 { font-size: 1.1rem; }
-  .acciones, .acciones .grupo { gap: 8px; }
-  table th, table td { font-size: 13px; }
+/* Tablas: no rompen en pantallas chicas */
+.table-wrap{ overflow:auto; -webkit-overflow-scrolling:touch; }
+table{ width:100%; border-collapse:collapse; }
+/* Cabecera pegajosa SOLO para tablas de la app (no para tickets) */
+.app-table thead th,
+.tabla thead th,
+.admin-table thead th{
+  position: sticky;
+  top: 0;
+  background: #161616;
+  z-index: 1;
+}
+td,th{ padding:8px 10px; white-space:nowrap; }
+@media (max-width:900px){ table{ min-width:720px } }
+
+/* Sidebar tipo drawer en mobile (si existe .sidebar) */
+@media (max-width:900px){
+  .sidebar{
+    position:fixed; inset:0 auto 0 0; z-index:1800;
+    transform:translateX(-100%); transition:transform .25s ease;
+  }
+  body.nav-open .sidebar{ transform:translateX(0) }
+  #content, .content{ padding-top:58px; }
+}
+
+/* ===== Solapas en mobile: botón ☰ + panel inferior ===== */
+@media (max-width:900px){
+  /* oculto las solapas originales (.tabs), se ven en el drawer */
+  .tabs{ display:none !important; }
+
+  .mobi-tabs-btn{
+    position:fixed; right:12px; top:12px; z-index:2100;
+    width:48px; height:48px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    background:#222; color:#ddd; border:1px solid #444;
+    box-shadow:0 4px 14px rgba(0,0,0,.3)
+  }
+  .mobi-tabs-btn span{
+    width:22px; height:2px; background:currentColor; display:block; position:relative;
+  }
+  .mobi-tabs-btn span::before,
+  .mobi-tabs-btn span::after{
+    content:""; position:absolute; left:0; width:22px; height:2px; background:currentColor;
+  }
+  .mobi-tabs-btn span::before{ top:-6px } .mobi-tabs-btn span::after{ top:6px }
+
+  .tabs-drawer{
+    position:fixed; left:0; right:0; bottom:0;
+    background:#111; border-top:1px solid #333;
+    transform:translateY(110%); transition:transform .25s ease;
+    z-index:2050; padding:12px; box-shadow:0 -20px 40px rgba(0,0,0,.4);
+  }
+  body.tabs-open .tabs-drawer{ transform:translateY(0) }
+
+  .tabs-drawer .tab-list{
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px;
+  }
+  .tabs-drawer .tab-list a,
+  .tabs-drawer .tab-list button{
+    display:block; text-align:center; padding:12px 10px;
+    background:#1b1b1b; border:1px solid #333; border-radius:10px; color:#ddd;
+  }
+}
+/* ===== Sidebar-aware: no limites el ancho cuando hay sidebar ===== */
+:root { --sidebar-w: 220px; }     /* si tu sidebar mide distinto, ajustalo */
+
+.has-sidebar {
+  display: flex;                  /* body en fila: sidebar + content */
+}
+
+.has-sidebar .sidebar {
+  flex: 0 0 var(--sidebar-w);
+  width: var(--sidebar-w);
+}
+
+/* Anula el max-width para que no “corte” el lienzo */
+.has-sidebar #content,
+.has-sidebar .content {
+  max-width: none !important;
+  margin: 0;                      /* sin centrado, ocupa todo el ancho libre */
+}
+
+/* (opcional) asegura que el content ocupe lo que queda */
+.has-sidebar #content,
+.has-sidebar .content {
+  width: calc(100% / var(--ui-scale));
+}
+
+/* Evitar clipping horizontal en escritorio */
+@media (min-width: 901px) {
+  html, body { overflow-x: visible; }
+}
+/* ===== Ticket / Liquidación: mantener look claro, sin heredar estilos oscuros ===== */
+.ticket-preview,
+.liq-preview{
+  background: #fff;      /* fondo blanco del papel */
+  color: #000;           /* texto negro */
+  font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+}
+
+/* Bordes y textos nítidos tipo “comprobante” */
+.ticket-preview table,
+.ticket-preview th,
+.ticket-preview td,
+.liq-preview table,
+.liq-preview th,
+.liq-preview td{
+  border-color: #000 !important;
+  color: #000 !important;
+}
+
+/* La cabecera del ticket NO se oscurece ni se vuelve sticky */
+.ticket-preview thead th,
+.liq-preview thead th{
+  background: #fff !important;
+  color: #000 !important;
+  position: static !important;
+}
+
+/* Asegurar que nada raro del escalado le pegue al papel */
+.ticket-preview, .ticket-preview *{
+  transform: none !important;
+  box-shadow: none !important;
 }

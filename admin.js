@@ -6038,6 +6038,134 @@ const horaStr  = ticket.hora
     console.error(e);
   }
 }
+/* ========== ENTER GLOBAL (ADMIN) — incluye NumpadEnter ========== */
+(function () {
+  const isEnter = (e) =>
+    e.key === 'Enter' || e.code === 'Enter' ||
+    e.key === 'NumpadEnter' || e.code === 'NumpadEnter';
+
+  // Logger mínimo (útil si algo no responde)
+  console.info('%c[ADMIN ENTER-HOOK] activo','color:#0f0');
+  document.addEventListener('keydown', (e) => {
+    if (!isEnter(e)) return;
+    const t = e.target || {};
+    // console.log('[ENTER@ADMIN]', { id:t.id, tag:t.tagName, type:t.type, code:e.code });
+  }, true);
+
+  function wireEnterClick(inputEl, buttonEl){
+    if (!inputEl || !buttonEl) return;
+    if (inputEl.__admEnterWired) return;
+    inputEl.__admEnterWired = true;
+    inputEl.addEventListener('keydown', (e)=>{
+      if (!isEnter(e)) return;
+      e.preventDefault();
+      buttonEl.click();
+    });
+  }
+
+  function wireAll(){
+    // ===== Top filtros (admin) =====
+    const btnRef = document.getElementById('adm_refrescar');
+    ['adm_desde','adm_hasta'].forEach(id=>{
+      const el = document.getElementById(id);
+      if (el && btnRef) wireEnterClick(el, btnRef);
+    });
+
+    // ===== Subpanel por pasador =====
+    document.querySelectorAll('#pas_desde, #pas_hasta').forEach(el=>{
+      if (el.__admEnterWired) return;
+      el.__admEnterWired = true;
+      el.addEventListener('keydown', (e)=>{
+        if (!isEnter(e)) return;
+        e.preventDefault();
+        // el botón puede estar dentro del mismo subpanel
+        const scope = el.closest('div') || document;
+        const btn = scope.querySelector('#pas_run') || document.getElementById('pas_run');
+        btn?.click();
+      });
+    });
+
+    // ===== (Opcional) Movimientos del admin =====
+    const btnMovAdm = document.getElementById('adm_mov_agregar');
+    document.querySelectorAll('#adm_mov_fecha,#adm_mov_monto,#adm_mov_nota').forEach(el=>{
+      if (btnMovAdm) wireEnterClick(el, btnMovAdm);
+    });
+
+    // ===== (Opcional) Movimientos por pasador =====
+    const btnMovPas = document.getElementById('pas_mov_agregar');
+    document.querySelectorAll('#pas_mov_fecha,#pas_mov_monto,#pas_mov_nota').forEach(el=>{
+      if (btnMovPas) wireEnterClick(el, btnMovPas);
+    });
+
+    // ===== Regla genérica para inputs de FECHA (fallback) =====
+    document.querySelectorAll('input[type="date"], input[id*="fecha" i], input[name*="fecha" i]')
+      .forEach(el=>{
+        if (el.__admEnterGen) return;
+        el.__admEnterGen = true;
+        el.addEventListener('keydown', (e)=>{
+          if (!isEnter(e)) return;
+          const scope = el.closest('form, .card, .box, div') || document;
+          const btn =
+            scope.querySelector('#adm_refrescar, #pas_run, #btnEnviar, #jv_buscar, button[type="submit"]') ||
+            document.getElementById('adm_refrescar');
+          if (btn){ e.preventDefault(); btn.click(); }
+        });
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', wireAll);
+  new MutationObserver(wireAll).observe(document.documentElement, { childList:true, subtree:true });
+})();
+// === Mobile Tabs (clona .tabs al drawer inferior y agrega botón ☰) ===
+(function () {
+  // no molestar en pantallas grandes
+  if (window.matchMedia('(min-width: 901px)').matches) return;
+
+  // ¿hay solapas declaradas?
+  var tabs = document.querySelector('.tabs');
+  if (!tabs) return;
+
+  // botón hamburguesa fijo arriba
+  if (!document.getElementById('hamb-btn')) {
+    var btn = document.createElement('button');
+    btn.id = 'hamb-btn';
+    btn.className = 'hamb';
+    btn.innerHTML = '<span></span>';
+    btn.title = 'Menú';
+    btn.onclick = function () { document.body.classList.toggle('nav-open'); };
+    document.body.appendChild(btn);
+  }
+
+  // cajón inferior
+  if (!document.getElementById('mobileTabs')) {
+    var panel = document.createElement('div');
+    panel.id = 'mobileTabs';
+    panel.className = 'mobile-tabs';
+    panel.innerHTML = '<div class="mt-content"></div>';
+    document.body.appendChild(panel);
+  }
+
+  // clonar botones/links de la barra original
+  var mt = document.querySelector('#mobileTabs .mt-content');
+  if (!mt) return;
+
+  // limpiar por si se re-ejecuta
+  mt.innerHTML = '';
+
+  // prioridades: button, a, .btn-solapa, li>button
+  var items = tabs.querySelectorAll('button, a, .btn-solapa, li > button');
+  items.forEach(function (el, idx) {
+    // hacemos un clon visual que al click dispara el original
+    var b = document.createElement('button');
+    b.className = 'mt-btn';
+    b.textContent = (el.textContent || el.innerText || '').trim() || ('Opción ' + (idx + 1));
+    b.addEventListener('click', function () {
+      try { el.click(); } catch (_) {}
+      document.body.classList.remove('nav-open'); // cerrar cajón
+    });
+    mt.appendChild(b);
+  });
+})();
 // Exponer por si llamás desde HTML inline
 window.mostrarUsuariosAdmin = mostrarUsuariosAdmin;
 window.cargarUsuariosAdmin = cargarUsuariosAdmin;

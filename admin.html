@@ -104,8 +104,8 @@
     }
   </style>
 </head>
-<body>
-  <aside>
+<body class="has-sidebar">
+  <aside class="tabs">
     <h2>CLAU712 🛠</h2>
     <button class="btn-solapa" data-seccion="carga">📥 Carga de Jugadas</button>
     <button class="btn-solapa" data-seccion="enviadas">📄 Jugadas Enviadas</button>
@@ -117,7 +117,7 @@
     <button class="btn-solapa" data-seccion="usuarios">👥 Usuarios</button>
     <button onclick="window.location.href='index.html'">🔒 Cerrar Sesión</button>
   </aside>
-
+  <div id="content">
   <main id="zonaContenido">
     <section id="inicio">
       <h1>Bienvenido al Panel de Administrador</h1>
@@ -178,6 +178,7 @@
       </button>
     </section>
   </main>
+</div> <!-- /#content -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>  

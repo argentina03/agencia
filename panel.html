@@ -7,8 +7,8 @@
   <link rel="stylesheet" href="style.css" />
   <script src="https://kit.fontawesome.com/a67d08e98b.js" crossorigin="anonymous"></script>
 </head>
-<body class="panel-body">
-  <div class="sidebar">
+<body class="panel-body has-sidebar">
+  <div class="sidebar tabs">
     <h2>CLAU712</h2>
     <button onclick="mostrarSeccion('jugadas')">Carga de Jugadas</button>
     <button onclick="mostrarSeccion('enviadas')">Jugadas Enviadas</button>
@@ -17,22 +17,22 @@
     <button onclick="mostrarSeccion('perfil')">Editar Perfil</button>
     <button onclick="cerrarSesion()">Cerrar Sesión</button>
   </div>
-
+  <div id="content">
   <main class="contenido" id="contenidoPrincipal">
     <h1>Bienvenido a CLAU712</h1>
     <p style="color:#888; text-align:center; margin-top:20px;">Seleccioná una opción del menú para comenzar.</p>
   </main>
 
-  <!-- Sección de Resultados que se mostrará al hacer clic en el botón -->
-  <div id="resultados-section" style="display:none;">
-    <!-- Aquí va el código que te proporcioné -->
-    <div style="text-align: center; margin-bottom: 20px;">
-      <input type="date" id="buscarFecha" style="padding: 10px; font-size: 14px;">
-      <button style="font-size: 18px; padding: 8px 20px; margin: 6px;" onclick="buscarResultados()">Buscar</button>
-    </div>
+  <!-- Sección de Resultados -->
+<section id="resultados" style="display:none;">
+  <div style="text-align: center; margin-bottom: 20px;">
+    <input type="date" id="buscarFecha" style="padding: 10px; font-size: 14px;">
+    <button style="font-size: 18px; padding: 8px 20px; margin: 6px;" onclick="buscarResultados()">Buscar</button>
+  </div>
 
-    <h2 style="text-align: center; color: white; background-color: #333; padding: 10px;">ACIERTOS DE JUGADAS</h2>
+  <h2 style="text-align: center; color: white; background-color: #333; padding: 10px;">ACIERTOS DE JUGADAS</h2>
 
+  <div class="table-wrap">
     <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
       <thead>
         <tr>
@@ -46,12 +46,12 @@
           <th style="padding: 10px; text-align: left; color: white; background-color: #222;">Acierto</th>
         </tr>
       </thead>
-      <tbody id="tablaAciertos">
-        <!-- Aquí se llenarán las filas con los aciertos -->
-      </tbody>
+      <tbody id="tablaAciertos"></tbody>
     </table>
+  </div>
 
-    <h3 style="text-align: center; color: white; margin-top: 20px;">Comparación de Loterías</h3>
+  <h3 style="text-align: center; color: white; margin-top: 20px;">Comparación de Loterías</h3>
+  <div class="table-wrap">
     <table style="width: 100%; margin-top: 10px;">
       <thead>
         <tr>
@@ -60,24 +60,20 @@
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td>A</td>
-          <td>Nacional</td>
-        </tr>
-        <tr>
-          <td>B</td>
-          <td>Provincia</td>
-        </tr>
-        <!-- Agregar más loterías -->
+        <tr><td>A</td><td>Nacional</td></tr>
+        <tr><td>B</td><td>Provincia</td></tr>
+        <!-- + las que quieras -->
       </tbody>
     </table>
-
-    <div style="margin-top: 20px; text-align: center;">
-      <input type="number" id="ticketNumero" placeholder="Número de ticket" style="padding: 8px; font-size: 14px;">
-      <button onclick="verificarPremio()" style="padding: 8px 20px;">Verificar Premio</button>
-      <p id="resultadoPremio" style="color: #ff9900;"></p>
-    </div>
   </div>
+
+  <div style="margin-top: 20px; text-align: center;">
+    <input type="number" id="ticketNumero" placeholder="Número de ticket" style="padding: 8px; font-size: 14px;">
+    <button onclick="verificarPremio()" style="padding: 8px 20px;">Verificar Premio</button>
+    <p id="resultadoPremio" style="color: #ff9900;"></p>
+  </div>
+</section>
+</div> <!-- /#content -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>  
   <script src="main.js"></script>

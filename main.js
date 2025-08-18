@@ -3473,6 +3473,25 @@ function setupDividirMontoUI() {
       if (mtOn && chk.checked) desactivarDividirMonto();
     } catch (_) {}
 }
+// === ENTER en la fecha -> click en Enviar (parche local y seguro)
+(function wireFiltroFechaLocal(){
+  const fecha = document.querySelector('#filtroFecha');
+  const btn   = document.querySelector('#btnEnviar');
+
+  console.log('[WIRE filtroFecha] fecha=', !!fecha, 'btn=', !!btn);
+  if (!fecha || !btn) return;
+
+  if (!fecha.__wiredEnterLocal){
+    fecha.__wiredEnterLocal = true;
+    fecha.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.code === 'Enter' || e.key === 'NumpadEnter' || e.code === 'NumpadEnter'){
+        e.preventDefault();
+        console.log('[ENTER filtroFecha] disparo click en #btnEnviar');
+        btn.click();
+      }
+    });
+  }
+})();
 // === Apagar "Dividir monto" y resetear UI ===
 function desactivarDividirMonto() {
   const chk = document.getElementById('dividirMonto'); // el checkbox (aunque esté oculto)
@@ -3484,3 +3503,256 @@ function desactivarDividirMonto() {
   // botón verde/gris
   try { updateDividirBtnUI(false); } catch (_) {}
 }
+/* ========== ENTER GLOBAL (incluye NumpadEnter) ========== */
+(function () {
+  const isEnter = (e) =>
+    e.key === 'Enter' || e.code === 'Enter' ||
+    e.key === 'NumpadEnter' || e.code === 'NumpadEnter';
+
+  // 1) Log mínimo (sirve para ver qué input lo dispara)
+  console.info('%c[ENTER-HOOK] inicializado','color:#0f0');
+  document.addEventListener('keydown', (e) => {
+    if (!isEnter(e)) return;
+    const t = e.target || {};
+    console.log('[ENTER]', { id: t.id, name: t.name, tag: t.tagName, type: t.type, code: e.code });
+  }, true);
+
+  // 2) Helper: Enter en un input -> click en un botón
+  function wireEnterClick(inputSel, buttonSel){
+    const el  = document.querySelector(inputSel);
+    const btn = typeof buttonSel === 'string' ? document.querySelector(buttonSel) : buttonSel;
+    if (!el)  { console.warn('[wireEnterClick] no existe', inputSel); return; }
+    if (!btn) { console.warn('[wireEnterClick] no existe', buttonSel); return; }
+    if (el.__wiredEnter) return;
+    el.__wiredEnter = true;
+    el.addEventListener('keydown',(e)=>{
+      if (!isEnter(e)) return;
+      e.preventDefault();
+      console.log('[ENTER] wireEnterClick =>', inputSel, '→', buttonSel);
+      btn.click();
+    });
+  }
+
+  // 3) Helper: Enter en un input -> ejecuta una función
+  function wireEnterRun(inputSel, fn){
+    const el = document.querySelector(inputSel);
+    if (!el){ console.warn('[wireEnterRun] no existe', inputSel); return; }
+    if (el.__wiredEnterRun) return;
+    el.__wiredEnterRun = true;
+    el.addEventListener('keydown',(e)=>{
+      if (!isEnter(e)) return;
+      e.preventDefault();
+      try { fn(); } catch(err){ console.error('wireEnterRun error', err); }
+    });
+  }
+
+  // 4) Regla genérica: si es un input de FECHA, Enter busca el botón más cercano
+  function genericDateEnter(e){
+    if (!isEnter(e)) return;
+    const t = e.target;
+    if (!t || t.tagName !== 'INPUT') return;
+
+    const looksLikeDateId = /fecha/i.test(t.id || '') || /fecha/i.test(t.name || '');
+    const isDateType      = (t.type || '').toLowerCase() === 'date';
+
+    if (!(isDateType || looksLikeDateId)) return;
+
+    // Busco un botón cercano dentro del bloque/section/form
+    let scope = t.closest('form, section, .card, .box, div') || document;
+    let btn =
+      scope.querySelector('button#btnEnviar, input#btnEnviar') ||
+      scope.querySelector('button#jv_buscar, input#jv_buscar') ||
+      scope.querySelector('button#adm_refrescar, input#adm_refrescar') ||
+      scope.querySelector('button#pas_run, input#pas_run') ||
+      scope.querySelector('button[type="submit"], input[type="submit"]') ||
+      scope.querySelector('button, input[type="button"]');
+
+    if (btn){
+      e.preventDefault();
+      console.log('[ENTER→GENÉRICO] Click en', btn.id || btn.textContent?.trim());
+      btn.click();
+    } else {
+      console.warn('[ENTER→GENÉRICO] No encontré botón cercano para', t.id || t.name);
+    }
+  }
+  document.addEventListener('keydown', genericDateEnter, true);
+
+  /* ========== Cableados concretos (si existen esos IDs) ========== */
+
+  function wireAll(){
+    // LOGIN: usuario → focus en clave; clave → click login
+    const usuario = document.querySelector('#usuario');
+    const clave   = document.querySelector('#clave');
+    const btnLog  = document.querySelector('#btnLogin');
+    if (usuario && !usuario.__goClave){
+      usuario.__goClave = true;
+      usuario.addEventListener('keydown', (e)=>{
+        if (!isEnter(e)) return;
+        if (clave){ e.preventDefault(); clave.focus(); }
+      });
+    }
+    if (clave && btnLog) wireEnterClick('#clave', '#btnLogin');
+
+    // ADMIN filtros
+    if (document.querySelector('#adm_desde') && document.querySelector('#adm_refrescar'))
+      wireEnterClick('#adm_desde', '#adm_refrescar');
+    if (document.querySelector('#adm_hasta') && document.querySelector('#adm_refrescar'))
+      wireEnterClick('#adm_hasta', '#adm_refrescar');
+
+    // SUBPANEL PASADOR
+    if (document.querySelector('#pas_desde') && document.querySelector('#pas_run'))
+      wireEnterClick('#pas_desde', '#pas_run');
+    if (document.querySelector('#pas_hasta') && document.querySelector('#pas_run'))
+      wireEnterClick('#pas_hasta', '#pas_run');
+
+    // JUGADAS ENVIADAS
+    if (document.querySelector('#jv_desde') && document.querySelector('#jv_buscar'))
+      wireEnterClick('#jv_desde', '#jv_buscar');
+    if (document.querySelector('#jv_hasta') && document.querySelector('#jv_buscar'))
+      wireEnterClick('#jv_hasta', '#jv_buscar');
+
+    // PANEL VENDEDOR (tu campo de arriba “fecha del día”)
+    if (document.querySelector('#filtroFecha') && document.querySelector('#btnEnviar'))
+      wireEnterClick('#filtroFecha', '#btnEnviar');
+    if (document.querySelector('#buscarFecha') && document.querySelector('#btnEnviar'))
+      wireEnterClick('#buscarFecha', '#btnEnviar');
+
+    // Reclamos: Enter en fecha ⇒ listar
+    if (document.querySelector('#recFecha'))
+      wireEnterRun('#recFecha', ()=>{ try{ listarReclamosDia(); }catch(_){} });
+  }
+
+  // Engancho ahora y cada vez que se agregue algo al DOM
+  document.addEventListener('DOMContentLoaded', wireAll);
+  new MutationObserver(wireAll).observe(document.documentElement, { childList:true, subtree:true });
+})();
+/* ========== PATCH: Enter para LOGIN (robusto) ========== */
+(function loginEnterPatch(){
+  const isEnter = (e) =>
+    e.key === 'Enter' || e.code === 'Enter' ||
+    e.key === 'NumpadEnter' || e.code === 'NumpadEnter';
+
+  function doLogin(){
+    const scope =
+      document.querySelector('#clave')?.closest('form, .card, .box, div') ||
+      document;
+    const btn =
+      scope.querySelector('#btnLogin, #btnIngresar, .btn-login, button[type="submit"]');
+    if (btn) { btn.click(); return true; }
+    if (typeof window.login === 'function')         { window.login(); return true; }
+    if (typeof window.iniciarSesion === 'function') { window.iniciarSesion(); return true; }
+    console.warn('[ENTER-LOGIN] No encontré botón ni función de login');
+    return false;
+  }
+
+  function wire(){
+    const u = document.querySelector('#usuario');
+    const p = document.querySelector('#clave');
+
+    if (u && !u.__loginWire){
+      u.__loginWire = true;
+      u.addEventListener('keydown', (e)=>{
+        if (!isEnter(e)) return;
+        e.preventDefault();
+        if (p) p.focus();
+      });
+    }
+
+    if (p && !p.__loginWire){
+      p.__loginWire = true;
+      p.addEventListener('keydown', (e)=>{
+        if (!isEnter(e)) return;
+        e.preventDefault();
+        doLogin();
+      });
+    }
+  }
+
+  // engancho ahora y también si el DOM cambia
+  document.addEventListener('DOMContentLoaded', wire);
+  new MutationObserver(wire).observe(document.documentElement, { childList:true, subtree:true });
+})();
+// ====== Fallback robusto para #filtroFecha ======
+(function(){
+  const isEnter = (e)=> e.key==='Enter' || e.code==='Enter' || e.key==='NumpadEnter' || e.code==='NumpadEnter';
+
+  function clickNearestBuscar(input){
+    // 1) Intento por id comunes
+    let btn = input.closest('form, .card, .box, .contenedor, body')
+      ?.querySelector('#btnEnviar, #btnBuscar, .btn-buscar, button[type="submit"]');
+
+    // 2) Si no hay, busco un botón visible que diga "Buscar" o "Enviar"
+    if (!btn){
+      const candidates = [...(input.closest('form, .card, .box, .contenedor, body')||document).querySelectorAll('button, input[type="button"], input[type="submit"]')];
+      btn = candidates.find(b => /buscar|enviar/i.test((b.innerText||b.value||'').trim()));
+    }
+
+    if (btn){ btn.click(); return true; }
+    console.warn('[ENTER→GENÉRICO] No encontré botón cercano para filtroFecha');
+    return false;
+  }
+
+  function wireFiltro(){
+    const f = document.querySelector('#filtroFecha');
+    if (!f || f.__wiredFiltroFecha) return;
+    f.__wiredFiltroFecha = true;
+    f.addEventListener('keydown', (e)=>{
+      if (!isEnter(e)) return;
+      e.preventDefault();
+      clickNearestBuscar(f);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', wireFiltro);
+  new MutationObserver(wireFiltro).observe(document.documentElement, { childList:true, subtree:true });
+})();
+// === Mobile Tabs (clona .tabs al drawer inferior y agrega botón ☰) ===
+(function () {
+  // no molestar en pantallas grandes
+  if (window.matchMedia('(min-width: 901px)').matches) return;
+
+  // ¿hay solapas declaradas?
+  var tabs = document.querySelector('.tabs');
+  if (!tabs) return;
+
+  // botón hamburguesa fijo arriba
+  if (!document.getElementById('hamb-btn')) {
+    var btn = document.createElement('button');
+    btn.id = 'hamb-btn';
+    btn.className = 'hamb';
+    btn.innerHTML = '<span></span>';
+    btn.title = 'Menú';
+    btn.onclick = function () { document.body.classList.toggle('nav-open'); };
+    document.body.appendChild(btn);
+  }
+
+  // cajón inferior
+  if (!document.getElementById('mobileTabs')) {
+    var panel = document.createElement('div');
+    panel.id = 'mobileTabs';
+    panel.className = 'mobile-tabs';
+    panel.innerHTML = '<div class="mt-content"></div>';
+    document.body.appendChild(panel);
+  }
+
+  // clonar botones/links de la barra original
+  var mt = document.querySelector('#mobileTabs .mt-content');
+  if (!mt) return;
+
+  // limpiar por si se re-ejecuta
+  mt.innerHTML = '';
+
+  // prioridades: button, a, .btn-solapa, li>button
+  var items = tabs.querySelectorAll('button, a, .btn-solapa, li > button');
+  items.forEach(function (el, idx) {
+    // hacemos un clon visual que al click dispara el original
+    var b = document.createElement('button');
+    b.className = 'mt-btn';
+    b.textContent = (el.textContent || el.innerText || '').trim() || ('Opción ' + (idx + 1));
+    b.addEventListener('click', function () {
+      try { el.click(); } catch (_) {}
+      document.body.classList.remove('nav-open'); // cerrar cajón
+    });
+    mt.appendChild(b);
+  });
+})();
