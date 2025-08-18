@@ -3720,55 +3720,28 @@ function desactivarDividirMonto() {
   document.addEventListener('DOMContentLoaded', wireFiltro);
   new MutationObserver(wireFiltro).observe(document.documentElement, { childList:true, subtree:true });
 })();
-// ===== MOBILE TABS: idempotente, una sola vez =====
-(function initMobileTabs(){
-  if (window.__MOBILE_TABS_WIRED__) return;
-  window.__MOBILE_TABS_WIRED__ = true;
-
+// === Hamburgesa mobile simple (sin solapas clonadas) ===
+(function () {
   // Solo en pantallas chicas
   if (window.matchMedia('(min-width: 901px)').matches) return;
 
-  const tabs = document.querySelector('.tabs');
-  if (!tabs) return;
+  // Si hay sidebar, mostramos la hamburguesa SIEMPRE (independiente de .tabs)
+  var sidebar = document.querySelector('.sidebar');
+  if (!sidebar) return;
 
-  // Botón hamburguesa (si no existe)
+  // Crear botón si no existe
   if (!document.getElementById('hamb-btn')) {
-    const btn = document.createElement('button');
+    var btn = document.createElement('button');
     btn.id = 'hamb-btn';
     btn.className = 'hamb';
     btn.innerHTML = '<span></span>';
     btn.title = 'Menú';
-    btn.addEventListener('click', ()=> document.body.classList.toggle('nav-open'));
+    btn.onclick = function () { document.body.classList.toggle('nav-open'); };
     document.body.appendChild(btn);
   }
 
-  // Drawer inferior (si no existe)
-  if (!document.getElementById('mobileTabs')) {
-    const panel = document.createElement('div');
-    panel.id = 'mobileTabs';
-    panel.className = 'mobile-tabs';
-    panel.innerHTML = '<div class="mt-content"></div>';
-    document.body.appendChild(panel);
-  }
-
-  // Clonar items de la barra original
-  const mt = document.querySelector('#mobileTabs .mt-content');
-  if (!mt) return;
-  mt.innerHTML = '';
-
-  const items = tabs.querySelectorAll('button, a, .btn-solapa, li > button');
-  items.forEach((el, idx) => {
-    const b = document.createElement('button');
-    b.className = 'mt-btn';
-    b.textContent = (el.textContent || el.innerText || '').trim() || ('Opción ' + (idx+1));
-    b.addEventListener('click', () => {
-      try { el.click(); } catch {}
-      document.body.classList.remove('nav-open'); // cerrar cajón
-      document.body.classList.add('tab-selected'); // ocultar barra original
-    });
-    mt.appendChild(b);
-  });
-
-  // Al cargar en mobile, marcá como “seleccionado” si ya estás en alguna solapa
-  document.body.classList.add('tab-selected');
+  // Asegurar que NO exista ningún drawer de solapas antiguo
+  var oldDrawer = document.getElementById('mobileTabs');
+  if (oldDrawer) oldDrawer.remove();
+  document.body.classList.remove('tabs-open');
 })();
