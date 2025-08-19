@@ -123,13 +123,74 @@ if (rol !== 'vendedor') {
   return; 
 }
 
-// 🍔 Botón hamburguesa para mobile
-if (window.matchMedia('(max-width: 900px)').matches) {
-  const btnHamb = document.createElement('button');
-  btnHamb.className = 'mobi-tabs-btn';
-  btnHamb.innerHTML = '<span></span>';
-  document.body.appendChild(btnHamb);
-}
+// === Hamburguesa Mobile Vendedor (robusta, sin duplicados) ===
+(function () {
+  if (window.__wiredHamburguesaVendedor) return;
+  window.__wiredHamburguesaVendedor = true;
+
+  const isMobile = () => window.matchMedia('(max-width: 900px)').matches;
+
+  function ensureHamburguesa() {
+    if (!isMobile()) return;
+
+    // Botón (crea si falta)
+    let btnHamb = document.querySelector('.mobi-tabs-btn');
+    if (!btnHamb) {
+      btnHamb = document.createElement('button');
+      btnHamb.className = 'mobi-tabs-btn';
+      btnHamb.type = 'button';
+      btnHamb.innerHTML = '<span></span>';
+      document.body.appendChild(btnHamb);
+    }
+
+    // Overlay (crea si falta)
+    let overlay = document.querySelector('.sidebar-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'sidebar-overlay';
+      document.body.appendChild(overlay);
+    }
+
+    const open  = () => document.body.classList.add('sidebar-open');
+    const close = () => document.body.classList.remove('sidebar-open');
+    const toggle = () => document.body.classList.toggle('sidebar-open');
+
+    // Click en el botón
+    if (!btnHamb.__wiredSidebar) {
+      btnHamb.__wiredSidebar = true;
+      btnHamb.addEventListener('click', toggle);
+    }
+    // Click fuera (overlay)
+    if (!overlay.__wiredSidebar) {
+      overlay.__wiredSidebar = true;
+      overlay.addEventListener('click', close);
+    }
+
+    // Delegación: cerrar al tocar cualquier item clickeable del menú
+    const sidebarEl = document.querySelector('.sidebar');
+    if (sidebarEl && !sidebarEl.__wiredCloseDelegate) {
+      sidebarEl.__wiredCloseDelegate = true;
+      sidebarEl.addEventListener('click', (e) => {
+        const hit = e.target.closest('button, a, [role="tab"], .tab, .menu-item, .btn, [data-tab]');
+        if (!hit) return;
+        if (isMobile()) close();
+      }, { passive: true });
+    }
+  }
+
+  // Al cargar y cuando pases a móvil
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureHamburguesa, { once: true });
+  } else {
+    ensureHamburguesa();
+  }
+  window.addEventListener('resize', ensureHamburguesa);
+  window.addEventListener('orientationchange', ensureHamburguesa);
+
+  // Si salís de móvil, asegurá cierre
+  window.addEventListener('resize', () => { if (!isMobile()) document.body.classList.remove('sidebar-open'); });
+})();
+
 // 🔄 Revalidar bloqueo desde la nube
 (async () => {
   try {
@@ -3720,28 +3781,70 @@ function desactivarDividirMonto() {
   document.addEventListener('DOMContentLoaded', wireFiltro);
   new MutationObserver(wireFiltro).observe(document.documentElement, { childList:true, subtree:true });
 })();
-// === Hamburgesa mobile simple (sin solapas clonadas) ===
+// === Hamburguesa Mobile Vendedor (creación perezosa + robusta) ===
 (function () {
-  // Solo en pantallas chicas
-  if (window.matchMedia('(min-width: 901px)').matches) return;
+  // No dupliques
+  if (window.__wiredHamburguesaVendedor) return;
+  window.__wiredHamburguesaVendedor = true;
 
-  // Si hay sidebar, mostramos la hamburguesa SIEMPRE (independiente de .tabs)
-  var sidebar = document.querySelector('.sidebar');
-  if (!sidebar) return;
+  const isMobile = () => window.matchMedia('(max-width: 900px)').matches;
 
-  // Crear botón si no existe
-  if (!document.getElementById('hamb-btn')) {
-    var btn = document.createElement('button');
-    btn.id = 'hamb-btn';
-    btn.className = 'hamb';
-    btn.innerHTML = '<span></span>';
-    btn.title = 'Menú';
-    btn.onclick = function () { document.body.classList.toggle('nav-open'); };
-    document.body.appendChild(btn);
+  function ensureHamburguesa() {
+    // Solo en mobile
+    if (!isMobile()) return;
+
+    // Botón (crea si falta)
+    let btnHamb = document.querySelector('.mobi-tabs-btn');
+    if (!btnHamb) {
+      btnHamb = document.createElement('button');
+      btnHamb.className = 'mobi-tabs-btn';
+      btnHamb.type = 'button';
+      btnHamb.innerHTML = '<span></span>';
+      document.body.appendChild(btnHamb);
+    }
+
+    // Overlay (crea si falta)
+    let overlay = document.querySelector('.sidebar-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'sidebar-overlay';
+      document.body.appendChild(overlay);
+    }
+
+    const open  = () => document.body.classList.add('sidebar-open');
+    const close = () => document.body.classList.remove('sidebar-open');
+    const toggle = () => document.body.classList.toggle('sidebar-open');
+
+    // Evitar doble binding
+    if (!btnHamb.__wiredSidebar) {
+      btnHamb.__wiredSidebar = true;
+      btnHamb.addEventListener('click', toggle);
+    }
+    if (!overlay.__wiredSidebar) {
+      overlay.__wiredSidebar = true;
+      overlay.addEventListener('click', close);
+    }
+
+    // Cerrar al elegir una solapa
+    document.querySelectorAll('.tabs button, .tabs [role="tab"], .tabs .tab').forEach(b => {
+      if (b.__wiredCloseOnClick) return;
+      b.__wiredCloseOnClick = true;
+      b.addEventListener('click', () => { if (isMobile()) close(); });
+      b.addEventListener('touchend', () => { if (isMobile()) close(); }, { passive: true });
+    });
   }
 
-  // Asegurar que NO exista ningún drawer de solapas antiguo
-  var oldDrawer = document.getElementById('mobileTabs');
-  if (oldDrawer) oldDrawer.remove();
-  document.body.classList.remove('tabs-open');
+  // 1) Cuando el DOM esté listo, intentá crear si ya es mobile
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureHamburguesa, { once: true });
+  } else {
+    ensureHamburguesa();
+  }
+
+  // 2) Si después cambiás a mobile, creá en ese momento
+  window.addEventListener('resize', ensureHamburguesa);
+  window.addEventListener('orientationchange', ensureHamburguesa);
+
+  // 3) Si salís de mobile, asegurá que se cierre
+  window.addEventListener('resize', () => { if (!isMobile()) document.body.classList.remove('sidebar-open'); });
 })();

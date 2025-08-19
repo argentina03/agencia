@@ -1650,51 +1650,36 @@ td,th{ padding:8px 10px; white-space:nowrap; }
   :root{ --ui-scale: 1 !important; }
   #content, .content { padding: 12px; }
 }
-/* ===== MOBILE: única hamburguesa + panel inferior de solapas ===== */
-@media (max-width: 900px){
-  /* ocultar las solapas originales en móvil */
-  .tabs { display: none !important; }
 
-  /* botón hamburguesa fijo arriba a la derecha */
-  .hamb{
-    position:fixed; right:12px; top:12px; z-index:2100;
-    width:48px; height:48px; border-radius:12px;
-    background:#222; color:#ddd; border:1px solid #444;
-    display:flex; align-items:center; justify-content:center;
-    box-shadow:0 6px 18px rgba(0,0,0,.35);
-    cursor:pointer;
+/* === MOBILE SIDEBAR (vendedor) === */
+@media (max-width: 900px) {
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 80%;
+    max-width: 300px;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    z-index: 1000;
   }
-  .hamb span{ width:22px; height:2px; background:currentColor; position:relative; display:block; }
-  .hamb span::before,.hamb span::after{
-    content:""; position:absolute; left:0; width:22px; height:2px; background:currentColor;
-  }
-  .hamb span::before{ top:-6px } .hamb span::after{ top:6px }
+  body.sidebar-open .sidebar { transform: translateX(0); }
 
-  /* drawer inferior que se abre/cierra */
-  .mobile-tabs{
-    position:fixed; left:0; right:0; bottom:0; z-index:2050;
-    transform:translateY(110%); transition:transform .25s ease;
-    background:#0f0f0f; border-top:1px solid #2a2a2a; padding:12px;
-    box-shadow:0 -18px 34px rgba(0,0,0,.45);
+  .mobi-tabs-btn {
+    position: fixed;
+    top: 12px; left: 12px;
+    width: 38px; height: 38px;
+    background: #333;
+    border: 0; border-radius: 8px;
+    z-index: 1100;
   }
-  body.nav-open .mobile-tabs{ transform:translateY(0); }
+  .mobi-tabs-btn span { display:block; width:22px; height:2px; background:#fff; position:relative; margin:0 auto; }
+  .mobi-tabs-btn span::before,
+  .mobi-tabs-btn span::after { content:''; position:absolute; left:0; width:22px; height:2px; background:#fff; top:-6px; }
+  .mobi-tabs-btn span::after { top:6px; }
 
-  .mobile-tabs .mt-content{
-    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px;
+  .sidebar-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    z-index: 900; display: none;
   }
-  .mobile-tabs .mt-btn{
-    background:#1c1c1c; border:1px solid #303030; color:#eaeaea;
-    border-radius:10px; padding:12px 10px; font-size:15px; font-weight:600;
-    width:100%;
-  }
-
-  /* asegurar espacio para el drawer y evitar zoom raro */
-  :root{ --ui-scale: 1 !important; }
-  #content, .content{
-    transform:none !important;
-    width:100% !important;
-    max-width:none !important;
-    padding:12px 12px 72px; /* deja espacio para el drawer */
-    box-sizing:border-box;
-  }
+  body.sidebar-open .sidebar-overlay { display: block; }
 }
