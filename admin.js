@@ -6130,6 +6130,8 @@ const horaStr  = ticket.hora
 (function () {
   // no molestar en pantallas grandes
   if (window.matchMedia('(min-width: 901px)').matches) return;
+  // si hay .sidebar (nuevo esquema), NO usar el cajón inferior
+if (document.querySelector('.sidebar')) return;
 
   // ¿hay solapas declaradas?
   var tabs = document.querySelector('.tabs');
@@ -6184,3 +6186,60 @@ window.cambiarClaveAdmin = cambiarClaveAdmin;
 window.cambiarRolAdmin = cambiarRolAdmin;
 window.eliminarUsuarioAdmin = eliminarUsuarioAdmin;
 window.toggleBloqueoAdmin = toggleBloqueoAdmin;
+// === Hamburguesa Mobile ADMIN (igual a vendedor) ===
+(function () {
+  if (window.__wiredHamburguesaAdmin) return;
+  window.__wiredHamburguesaAdmin = true;
+
+  const isMobile = () => window.matchMedia('(max-width: 900px)').matches;
+
+  function ensure() {
+    if (!isMobile()) {
+      document.body.classList.remove('sidebar-open');
+      return;
+    }
+
+    // Botón hamburguesa (izquierda)
+    let btn = document.querySelector('.mobi-tabs-btn');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.className = 'mobi-tabs-btn';
+      btn.type = 'button';
+      btn.innerHTML = '<span></span>';
+      document.body.appendChild(btn);
+    }
+
+    // Overlay para cerrar tocando fuera
+    let overlay = document.querySelector('.sidebar-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'sidebar-overlay';
+      document.body.appendChild(overlay);
+    }
+
+    const toggle = () => document.body.classList.toggle('sidebar-open');
+    const close  = () => document.body.classList.remove('sidebar-open');
+
+    if (!btn.__wired) { btn.__wired = true; btn.addEventListener('click', toggle); }
+    if (!overlay.__wired) { overlay.__wired = true; overlay.addEventListener('click', close); }
+
+    // Delegación: si tocás un item del menú, cerrar
+    const sb = document.querySelector('.sidebar');
+    if (sb && !sb.__wiredClose) {
+      sb.__wiredClose = true;
+      sb.addEventListener('click', (e) => {
+        if (e.target.closest('button, a, [role="tab"], .tab, .menu-item, .btn, [data-seccion]')) {
+          if (isMobile()) close();
+        }
+      }, { passive: true });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensure, { once: true });
+  } else {
+    ensure();
+  }
+  window.addEventListener('resize', ensure);
+  window.addEventListener('orientationchange', ensure);
+})();
