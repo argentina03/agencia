@@ -593,7 +593,7 @@ const grupos = {};
   </div>
 `;
 
-  html += `<div class="ticket-preview" style="font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;background:white;padding:25px;color:black;text-align:center;width:320px;margin:0 auto">
+ html += `<div class="ticket-preview" style="font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;background:white;padding:20px;color:black;text-align:center;width:320px;margin:0 auto;border:2px solid #000;transform:scale(1.2);transform-origin:top center;font-weight:900">
 <div style="font-size:24px;font-weight:900;margin-bottom:10px">TICKET #${numeroTicket}</div>
 
 <div style="display:flex;justify-content:space-between;font-size:16px;margin-bottom:6px">
@@ -1049,7 +1049,7 @@ filtrarEnviadas();
   case 'resultados':
     contenido.innerHTML = `
       <h1>Resultados</h1>
-      <div id="modalTicket" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      <div id="modalTicket" style="display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%);
 z-index: 9999; background: white; padding: 24px; border: 3px solid black; max-width: 500px; width: 95%; box-shadow: 0 0 20px rgba(0,0,0,0.7); font-family: monospace;">
 </div>
      <div style="
@@ -1152,7 +1152,7 @@ z-index: 9999; background: white; padding: 24px; border: 3px solid black; max-wi
           <button onclick="imprimirLiquidacion()" style="padding:10px 20px;font-size:16px">🖨 Imprimir</button>
           <button onclick="guardarLiquidacionComoImagen()" style="padding:10px 20px;font-size:16px">📷 Guardar Imagen</button>
         </div>
-  <div class="liquidacion-ticket" style="font-family:monospace;background:white;padding:24px;color:black;text-align:left;width:440px;margin:0 auto;border:2px solid black">
+  <div class="liquidacion-ticket" style="font-family:monospace;background:white;padding:24px;color:black;text-align:left;width:440px;margin:0 auto;border:2px solid black;font-weight:900">
     <div class="fecha" style="margin-bottom:10px;"></div>
   </div>
   `;
@@ -2230,7 +2230,7 @@ const hora  = ticket.hora
     <button onclick="mostrarSeccion('enviadas')" style="font-size:18px;padding:6px 12px;margin:5px">🔙 Volver</button>
   </div>
 
-  <div class="ticket-preview" style="font-family:monospace;background:white;padding:20px;color:black;text-align:center;width:300px;margin:0 auto">
+  <div class="ticket-preview" style="font-family:monospace;background:white;padding:20px;color:black;text-align:center;width:300px;margin:0 auto;transform:scale(1.2);transform-origin:top center;font-weight:900">
     <h3 style="margin:0">TICKET #${ticket.numero || '¿?'}</h3>
     <p style="margin:4px 0">Fecha: ${fecha} &nbsp;&nbsp; Hora: ${hora} &nbsp;&nbsp; Pasador: ${ticket.vendedor}</p>
 `;
@@ -2864,7 +2864,7 @@ async function verTicketPremiado() {
       <button onclick="guardarTicketGanadorComoImagen()" style="font-size:18px;padding:8px 20px;margin:6px">📷 Guardar Imagen</button>
     </div>
 
-    <div class="ticket-preview" style="font-family:monospace;background:white;padding:24px;color:black;text-align:left;width:440px;margin:0 auto;border:2px solid black">
+    <div class="ticket-preview" style="font-family:monospace;background:white;padding:20px;color:black;text-align:center;width:300px;margin:0 auto;transform:scale(1.2);transform-origin:top center;font-weight:900">
       <div style="display:flex;justify-content:space-between;font-size:21px;font-weight:bold;margin-bottom:6px">
         <div>TICKET #${ticketNumero}</div>
         <div>PREMIADO</div>

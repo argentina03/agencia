@@ -2178,7 +2178,7 @@ function renderTicketPreviewAdmin(ticket) {
     <button onclick="descargarTicketComoImagenAdmin()" style="font-size:14px;padding:6px 12px;margin:4px">📷 Guardar Imagen</button>
   </div>
 
-  <div class="ticket-preview" style="font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;background:white;padding:20px;color:black;text-align:center;width:320px;margin:0 auto;border:2px solid #000">
+  <div class="ticket-preview" style="font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;background:white;padding:20px;color:black;text-align:center;width:320px;margin:0 auto;border:2px solid #000;transform:scale(1.2);transform-origin:top center;font-weight:900;line-height:1.5">
     <div style="font-size:20px;font-weight:900;margin-bottom:8px">TICKET #${numero}</div>
 
     <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
@@ -2390,10 +2390,11 @@ function renderTicketHTMLAdmin(ticket) {
   };
 
   let html = `
-  <div class="ticket-preview" id="ticketPreviewAdmin" style="
-    font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;
-    background:white; color:black; text-align:center;
-    width:340px; margin:0 auto; border:2px solid #000; padding:22px;">
+   <div class="ticket-preview" id="ticketPreviewAdmin" style="
+   font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;
+   background:white; color:black; text-align:center;
+   width:340px; margin:0 auto; border:2px solid #000; padding:22px;
+   transform:scale(1.2);transform-origin:top center;font-weight:900;line-height:1.5">
     <div style="font-size:22px;font-weight:900;margin-bottom:8px">TICKET #${numero}</div>
     <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px">
       <div style="text-align:left">
@@ -3832,7 +3833,7 @@ async function renderLiquidacionRealAdmin({ fecha, vendedor, targetEl }) {
         </button>
       </div>
       <div id="liqTicketBody" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-          background:#fff;color:#000;border:2px solid #000;border-radius:14px;padding:22px;max-width:540px;margin:0 auto"></div>
+    background:#fff;color:#000;border:2px solid #000;border-radius:14px;padding:22px;max-width:540px;margin:0 auto;font-weight:900"></div>
     </div>
   `;
 
@@ -5990,7 +5991,7 @@ const horaStr  = ticket.hora
       </div>
     `;
 
-    html += `<div class="ticket-preview" style="font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;background:white;padding:25px;color:black;text-align:center;width:320px;margin:0 auto">
+    html += `<div class="ticket-preview" style="font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;background:white;padding:20px;color:black;text-align:center;width:320px;margin:0 auto;border:2px solid #000;transform:scale(1.2);transform-origin:top center;font-weight:900">
       <div style="font-size:24px;font-weight:900;margin-bottom:10px">TICKET #${numeroTicket}</div>
 
       <div style="display:flex;justify-content:space-between;font-size:16px;margin-bottom:6px">
