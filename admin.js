@@ -2523,10 +2523,15 @@ async function subirResultadoManual() {
   const horario  = (horSel?.value || lotHidden?.getAttribute('data-horario') || '').trim();
 
   // números: exactamente 20 y cada uno 4 dígitos
-  const inputs   = document.querySelectorAll('.campo-numero-ganador');
-  const numeros  = Array.from(inputs)
-    .map(i => (i.value || '').replace(/\D/g,'').slice(-4))
-    .filter(n => n.length === 4);
+  const numeros = Array.from(document.querySelectorAll('.campo-numero-ganador'))
+  .sort((a,b) => (+a.dataset.idx) - (+b.dataset.idx))   // 0..19 → 1..20
+  .map(i => (i.value || '').replace(/\D/g,'').slice(-4));
+
+if (numeros.length !== 20 || numeros.some(n => n.length !== 4)) {
+  alert("Completá la fecha, la lotería, el horario y los 20 números (4 dígitos cada uno).");
+  console.warn('⚠️ Faltan datos para subir resultado', { fecha, loteria, horario, cantNums: numeros.length, numeros });
+  return;
+}
 
   if (!fecha || !loteria || !horario || numeros.length !== 20) {
     alert("Completá la fecha, la lotería, el horario y los 20 números (4 dígitos cada uno).");
@@ -2586,12 +2591,13 @@ async function subirResultadoManual() {
   }
   
   function pegarDesdePortapapeles() {
-    navigator.clipboard.readText().then(texto => {
-      const numeros = (String(texto).match(/\b\d{4}\b/g) || []).slice(0, 20);
-      const inputs = document.querySelectorAll(".campo-numero-ganador");
-      inputs.forEach((input, i) => { input.value = numeros[i] || ''; });
-    }).catch(() => alert("❌ No se pudo leer del portapapeles."));
-  }
+  navigator.clipboard.readText().then(texto => {
+    const crudos = (String(texto).match(/\b\d{4}\b/g) || []).slice(0, 20);
+    // si viene 1-11-2-12-... lo reordenamos a 1..20; si ya viene 1..20 no rompe nada
+    const ordenados = reordenarFormatoColumna(crudos);
+    volcarAInputs(ordenados); // escribe usando data-idx (1..20)
+  }).catch(() => alert("❌ No se pudo leer del portapapeles."));
+}
   
   // ⬇⬇⬇ Hacer visibles globalmente para que los botones puedan llamarlas
   window.subirResultadoManual = subirResultadoManual;
