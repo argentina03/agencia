@@ -3929,7 +3929,7 @@ async function renderLiquidacionRealAdmin({ fecha, vendedor, targetEl }) {
       </div>
       <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:10px">
         <div>FECHA:&nbsp;<strong>${fecha}</strong></div>
-        <div>CLAU712</div>
+        <div>ARGENTINA</div>
       </div>
 
       <hr style="border:2px solid #000;margin:6px 0 10px 0">

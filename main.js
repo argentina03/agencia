@@ -1284,7 +1284,7 @@ case 'perfil':
   break;
   
     default:
-      contenido.innerHTML = `<h1>Bienvenido a CLAU712</h1>`;
+      contenido.innerHTML = `<h1>Bienvenido a ARGENTINA</h1>`;
   }
   // 👇 Al final de la función (afuera del switch)
   if (window.matchMedia('(max-width: 900px)').matches) {
@@ -2775,7 +2775,7 @@ contenedor.innerHTML = `
 
   <div style="display:flex;justify-content:space-between;font-family:monospace;font-size:15px;margin-bottom:10px">
     <div>FECHA: ${fechaSeleccionada}</div>
-    <div>CLAU712</div>
+    <div>ARGENTINA</div>
   </div>
 
   <hr style="border:1.5px solid black;margin:10px 0">
