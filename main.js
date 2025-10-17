@@ -111,6 +111,20 @@ document.addEventListener("DOMContentLoaded", () => {
   // 🛑 Si no estamos en el panel, no ejecutes nada más
   if (!document.getElementById("contenidoPrincipal")) return;
   // 🔐 Solo vendedores pueden ver este panel
+  // 🔄 Cargar todas las jugadas de la nube apenas inicia el panel
+setTimeout(() => {
+  try {
+    vendedor = localStorage.getItem('claveVendedor'); // 🔒 aseguramos el pasador activo
+    if (vendedor && vendedor !== 'SIN_VENDEDOR') {
+      cargarJugadasDesdeNube(true);
+    } else {
+      console.warn('⚠️ No se cargaron jugadas: vendedor no definido aún.');
+    }
+  } catch (e) {
+    console.warn('No se pudo precargar jugadas', e);
+  }
+}, 500);
+
 const rol = (localStorage.getItem('rolUsuario') || '').toLowerCase();
 const usuario = localStorage.getItem('claveVendedor');
 
@@ -215,7 +229,6 @@ if (rol !== 'vendedor') {
   // 1. Limpiar datos antiguos de más de 15 días
   limpiarDatosAntiguos();  
 
-  cargarJugadasDesdeNube();
 
   // Esperamos que los campos existan en el DOM
   const usuarioInput = document.getElementById('usuario');
@@ -300,18 +313,92 @@ async function obtenerJugadasDesdeSupabase(diasAtras = 15) {
 
   return data;
 }
-async function cargarJugadasDesdeNube() {
-  const contenedor = document.getElementById("enviadas");
-  if (!contenedor) {
-    if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
-      console.warn("⛔ No se encontró el contenedor 'enviadas'. Deteniendo carga.");
-    }
+async function cargarJugadasDesdeNube(forzar = false) {
+  const contenedor = document.getElementById("tablaEnviadas");
+
+  // 🧱 Si no hay contenedor visible, no hagas nada
+  if (!contenedor && !forzar) {
+    console.warn("⚠️ No se encontró el contenedor 'tablaEnviadas'.");
     return;
   }
 
-  contenedor.innerHTML = "<p style='text-align:center;color:gray'>Cargando jugadas...</p>";
-  jugadasEnviadas = await obtenerJugadasDesdeSupabase();
-  filtrarEnviadas();
+  // 🚫 Mostrar cartel de “cargando” y ocultar tabla momentáneamente
+  const tbody = document.getElementById('tablaEnviadas');
+  if (tbody) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="padding:30px;text-align:center;color:#999;font-size:15px;background:#111;">
+          🔄 Cargando jugadas seguras del pasador...
+        </td>
+      </tr>`;
+  }
+
+  try {
+    // Cargamos TODAS las jugadas del vendedor
+    const vendedor = localStorage.getItem('claveVendedor');
+    const { data, error } = await supabase
+      .from("jugadas_enviadas")
+      .select("*")
+      .eq("vendedor", vendedor)
+      .order("fecha", { ascending: true })
+      .order("hora", { ascending: true });
+
+    if (error) throw error;
+
+    // Guardamos todas las jugadas del vendedor
+    window.jugadasEnviadas = data || [];
+
+    // 🧩 Sincronizar estructura global para poder repetir tickets sin entrar a "Enviadas"
+    const vendedorActivo = localStorage.getItem('claveVendedor');
+    if (!window.jugadasEnviadasGlobal) window.jugadasEnviadasGlobal = {};
+    window.jugadasEnviadasGlobal[vendedorActivo] = data || [];
+    localStorage.setItem('jugadasEnviadasGlobal', JSON.stringify(window.jugadasEnviadasGlobal));
+
+    console.log(`✅ Jugadas cargadas (${data.length}) para el vendedor ${vendedorActivo}`);
+
+    // 🎯 Mostrar solo las del día actual después de guardar todo
+    filtrarSoloHoy();
+  } catch (err) {
+    console.error("❌ Error al cargar jugadas:", err);
+    const tbody = document.getElementById('tablaEnviadas');
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="padding:30px;text-align:center;color:red;background:#111;">
+            ⚠️ Error al cargar jugadas desde la nube
+          </td>
+        </tr>`;
+    }
+  }
+}
+
+// 🧩 Muestra solo las jugadas del día actual (visual, no filtra memoria)
+function filtrarSoloHoy() {
+  const tbody = document.getElementById('tablaEnviadas');
+  if (!tbody) return;
+
+  const hoy = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const jugadasHoy = (window.jugadasEnviadas || []).filter(j => j.fecha === hoy);
+
+  if (jugadasHoy.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="padding:30px;text-align:center;color:#999;background:#111;">
+          📭 No hay jugadas enviadas hoy.
+        </td>
+      </tr>`;
+    document.querySelector('.total-enviadas').innerText = `$0`;
+    return;
+  }
+
+  // Usamos tu render actual sin romperlo
+  renderizarFiltradas(jugadasHoy);
+
+  const totalHoy = jugadasHoy
+    .filter(t => !t.anulado)
+    .reduce((acc, t) => acc + (t.total || 0), 0);
+
+  document.querySelector('.total-enviadas').innerText = `$${totalHoy.toLocaleString('es-AR')}`;
 }
 
 async function login() {
@@ -388,21 +475,78 @@ const tablaPremios = {
     "20_20": 16
   }
 };
-let numeroTicket = 1; // global
+let numeroTicket = 1; // global auxiliar (ya no se usa directamente)
 
-async function obtenerUltimoTicket() {
-  const { data, error } = await supabase
-    .from('contadores_tickets')
-    .select('ultimo_ticket')
-    .eq('vendedor', vendedor)
-    .single();
-    
-  if (data && data.ultimo_ticket !== undefined) {
-    numeroTicket = data.ultimo_ticket + 1;
+// =============================================
+// 🎟️ FUNCIÓN: generar ticket seguro en la nube
+// =============================================
+async function obtenerProximoTicketSeguro() {
+  try {
+    const vendedor = localStorage.getItem('claveVendedor');
+    if (!vendedor) throw new Error("No hay vendedor activo");
+
+    // 🧩 Llamada al RPC seguro en Supabase
+    const { data, error } = await supabase.rpc('incrementar_ticket', {
+      vendedor_in: vendedor
+    });
+
+    if (error) throw error;
+
+    // ⚙️ Compatibilidad: algunos retornan objeto, otros array
+    const numero = Array.isArray(data) ? data[0]?.nuevo_ticket : data?.nuevo_ticket;
+
+    if (!numero) throw new Error("RPC no devolvió número válido");
+    console.log(`🎟️ Ticket seguro generado desde la nube (${vendedor}): #${numero}`);
+
+    numeroTicket = numero; // actualizar auxiliar por si se usa en el render
+    return numero;
+  } catch (err) {
+    console.error("❌ Error generando ticket seguro:", err);
+    alert("Error al generar el número de ticket. Intentá de nuevo.");
+    return null;
   }
 }
+
+// =============================================
+// 🔍 FUNCIÓN: leer último ticket (solo lectura)
+// =============================================
+async function obtenerUltimoTicket() {
+  try {
+    const vendedor = localStorage.getItem('claveVendedor');
+    if (!vendedor) {
+      console.warn("⚠️ No hay vendedor cargado en localStorage todavía.");
+      return;
+    }
+
+    console.log("📡 Buscando último ticket global para:", vendedor);
+
+    const { data, error } = await supabase
+      .from('contadores_tickets')
+      .select('ultimo_ticket')
+      .eq('vendedor', vendedor)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    const ultimo = Number(data?.ultimo_ticket ?? 0);
+    if (!data) console.warn("⚠️ No se encontró registro en la nube para este vendedor.");
+
+    numeroTicket = ultimo + 1;
+    console.log(`✅ Último ticket leído: ${ultimo} → Próximo asignado: ${numeroTicket}`);
+
+    return numeroTicket;
+  } catch (err) {
+    console.error("🚨 Error general al obtener último ticket:", err);
+    return 1;
+  }
+}
+
+// =============================================
+// 🔢 VARIABLES GLOBALES Y LOTERÍAS
+// =============================================
 let jugadasEnviadas = [];
 let enterPressTime = 0;
+
 
 const loterias = {
   NAC: ["10:15", "12:00", "15:00", "18:00", "21:00"],
@@ -458,6 +602,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await obtenerUltimoTicket();
   bloquearCeldas();
   setInterval(bloquearCeldas, 30000);
+    actualizarTotalEnVivo();
 });
 async function guardarTicketEnSupabase(ticket) {
   const url = 'https://agithblutrkibaydjbsl.supabase.co/rest/v1/jugadas_enviadas';
@@ -485,6 +630,7 @@ async function guardarTicketEnSupabase(ticket) {
   return datos[0]; // ⬅️ Devuelve el ticket con ID generado
 }
 async function actualizarUltimoTicketEnSupabase(numeroUsado) {
+    const vendedor = localStorage.getItem('claveVendedor'); // ✅ agregado
   try {
     const { data, error } = await supabase
       .from('contadores_tickets')
@@ -542,9 +688,71 @@ function prorratearMontoTotal(jugadas, montoTotal) {
     return Array.isArray(jugadas) ? jugadas : [];
   }
 }
+
+// ===================================================
+// 💰 CALCULAR TOTAL EN VIVO (con todos los modos)
+// ===================================================
+function actualizarTotalEnVivo() {
+  const totalDiv = document.getElementById('totalEnVivo');
+  if (!totalDiv) return;
+
+  // ⚙️ Sin jugadas cargadas → $0
+  if (!window.jugadasTemp || window.jugadasTemp.length === 0) {
+    totalDiv.innerText = "TOTAL: $0";
+    return;
+  }
+
+  // ⚙️ Detectar modos activos
+  const usarMontoTotal = window.__MTicket?.activo === true;
+  const usarDividirMonto = localStorage.getItem('dividirMontoActivo') === '1';
+  const montoTotalDeseado = Number(window.__MTicket?.total || 0);
+
+  // ⚙️ Si está activo "Monto Total" → usar ese monto
+  if (usarMontoTotal && montoTotalDeseado > 0) {
+    totalDiv.innerText = `TOTAL: $${montoTotalDeseado.toLocaleString('es-AR')}`;
+    return;
+  }
+
+  // ⚙️ Si está activo "Dividir Monto" → recalcular prorrateando
+  let jugadasBase = [...window.jugadasTemp];
+  if (usarDividirMonto) {
+    try {
+      const montoDividir = Number(localStorage.getItem('montoTotalValor') || 0);
+      if (montoDividir > 0) {
+        jugadasBase = prorratearMontoTotal(jugadasBase, montoDividir);
+      }
+    } catch (e) {
+      console.warn("⚠️ Error al aplicar dividir monto:", e);
+    }
+  }
+
+  // ⚙️ Calcular total igual que en enviarTicket()
+  let total = 0;
+  jugadasBase.forEach(j => {
+    const cantidadLoterias = Array.isArray(j.loterias) ? j.loterias.length : 1;
+    const importe = Number(j.importe || 0);
+    total += importe * cantidadLoterias;
+  });
+
+  // 🎯 Mostrar total formateado
+  totalDiv.innerText = `TOTAL: $${total.toLocaleString('es-AR')}`;
+}
+
 async function enviarTicket() {
-  const jugadas = document.querySelectorAll('#listaJugadas tr');
-  if (jugadas.length === 0) return alert('No hay jugadas cargadas');
+  const botonEnviar = document.querySelector('.btn-jugar');
+  if (botonEnviar?.disabled) return;
+  if (botonEnviar) {
+    botonEnviar.disabled = true;
+    botonEnviar.innerText = "⏳ Enviando...";
+    botonEnviar.style.opacity = "0.6";
+  }
+  if (window.enviandoTicket) return;
+  window.enviandoTicket = true;
+
+  try {
+    // 🧩 tu código normal va acá
+    const jugadas = document.querySelectorAll('#listaJugadas tr');
+    if (jugadas.length === 0) return alert('No hay jugadas cargadas');
 
   const seleccionadas = document.querySelectorAll('.casilla-sorteo.activo');
   if (seleccionadas.length === 0) return alert('Seleccioná al menos una lotería');
@@ -565,7 +773,14 @@ const jugadasFuente = usarMontoTotal
 const fechaArg = new Date(now);
 const fechaStr = `${fechaArg.getFullYear()}-${String(fechaArg.getMonth() + 1).padStart(2, '0')}-${String(fechaArg.getDate()).padStart(2, '0')}`;
 const horaStr = `${String(fechaArg.getHours()).padStart(2, '0')}:${String(fechaArg.getMinutes()).padStart(2, '0')}:${String(fechaArg.getSeconds()).padStart(2, '0')}`;
-
+// 🧍 Pasador activo
+const vendedor = localStorage.getItem('claveVendedor') || 'Desconocido';
+// 🧩 Obtener número de ticket seguro desde la nube (por vendedor)
+const numeroTicket = await obtenerProximoTicketSeguro();
+if (!numeroTicket) {
+  alert("No se pudo generar número de ticket. Intentá nuevamente.");
+  return;
+}
 // Si necesitas la hora en formato de 24 horas
 const hora24 = horaStr; // Ejemplo: 03:07:00
 
@@ -577,7 +792,7 @@ const grupos = {};
 });
 
   const ordenarLoterias = (lista) => {
-    const orden = ['NAC', 'PRO', 'SFE', 'COR', 'RIO', 'CTE', 'MZA', 'CHA', 'JUJ', 'SAN', 'MIS', 'ORO', 'TUC'];
+    const orden = ['NAC','PRO','SFE','COR','RIO','CTE','MZA','CHA','JUJ','SAN','NQN','CHB','RIN','LRJ','SAL','MIS','SCR','TUC','SGO','ORO'];
     return lista.sort((a, b) => {
       const sigA = a.slice(0, 3);
       const sigB = b.slice(0, 3);
@@ -660,7 +875,7 @@ const grupos = {};
   document.getElementById('contenidoPrincipal').innerHTML = html;
 
   const ticket = {
-    numero: numeroTicket,
+    numero: numeroTicket,  // ✅ agregado
     fecha: fechaStr,
     hora: horaStr,
     total,
@@ -677,8 +892,6 @@ const grupos = {};
     const uuidBox = document.getElementById('uuidTicketReal');
     if (uuidBox) uuidBox.innerText = ticket.id;
   
-    await actualizarUltimoTicketEnSupabase(numeroTicket); // ✅ primero subís el usado
-    numeroTicket++; // ✅ recién ahora subís el local para el próximo
   }
 
 // ⬅️ Guarda en LocalStorage con todos los tickets de todos los pasadores
@@ -703,6 +916,15 @@ if (window.__MTicket) {
 
 desactivarMontoTotal();   // UI a gris si existe el botón
 desactivarDividirMonto(); // UI a gris si existe el botón
+  } finally {
+    // ✅ Esto se ejecuta SIEMPRE, aunque haya error o alert
+    if (botonEnviar) {
+      botonEnviar.disabled = false;
+      botonEnviar.innerText = "🎯 Jugar";
+      botonEnviar.style.opacity = "1";
+    }
+    window.enviandoTicket = false;
+  }
 }
 
 function descargarTicket() {
@@ -946,6 +1168,11 @@ function mostrarSeccion(seccion) {
               </thead>
               <tbody id="listaJugadas"></tbody>
             </table>
+            <!-- 💰 Total en vivo del ticket -->
+<div id="totalEnVivo" 
+     style="color:#ffffff;font-size:22px;font-weight:900;margin-top:12px;margin-bottom:8px;text-align:right;letter-spacing:1px">
+  Total: $0
+</div>
             <div class="acciones-ticket">
              <div style="display: flex; gap: 16px; justify-content: center; align-items: center; margin-top: 10px;">
   <button class="btn-repetir" id="btnRepetir" style="
@@ -1538,7 +1765,7 @@ const jugadasFuente = usarMontoTotal
       
         // Eliminar marca
         delete jugadaEditando._editando;
-      
+      actualizarTotalEnVivo(); // 💰 recalcular después de editar
         // Activar eventos
         nuevoTr.querySelector('.editar').onclick = () => {
           jugadasTemp.forEach(j => delete j._editando);
@@ -1562,6 +1789,7 @@ const jugadasFuente = usarMontoTotal
         nuevoTr.querySelector('.eliminar').onclick = () => {
           jugadasTemp = jugadasTemp.filter(j => j !== nueva);
           nuevoTr.remove();
+            actualizarTotalEnVivo(); // 💰 recalcular después de eliminar
         };
       
         // Restaurar botón y limpiar
@@ -1622,7 +1850,8 @@ const jugada = {
         if (index !== -1) {
           jugadasTemp.splice(index, 1, editable);
         }
-      
+      // 💰 Actualizar total en vivo al editar
+actualizarTotalEnVivo();
         campos[0].value = editable.numero;
         campos[1].value = editable.posicion;
         campos[2].value = editable.importe;
@@ -1643,14 +1872,25 @@ const jugada = {
       };
   
       tr.querySelector('.eliminar').onclick = () => {
-        jugadasTemp = jugadasTemp.filter(j => j !== jugada);
-        tr.remove();
-      };
+  // Eliminar la jugada del array temporal
+  jugadasTemp = jugadasTemp.filter(j => j !== jugada);
+  
+  // Actualizar referencia global
+  window.jugadasTemp = jugadasTemp;
+
+  // Quitar la fila de la tabla
+  tr.remove();
+
+  // 💰 Recalcular total en vivo
+  actualizarTotalEnVivo();
+};
   
       lista.appendChild(tr);
       Object.freeze(jugada);
 Object.freeze(jugada.loterias);
 jugadasTemp.push(jugada);
+window.jugadasTemp = jugadasTemp; // ✅ asegura visibilidad global
+actualizarTotalEnVivo();
   
       campos.forEach((c, i) => {
         if (i === 2) {
@@ -1673,12 +1913,41 @@ function repetirJugadas() {
   const ticketId = prompt("¿Qué número de ticket querés repetir?");
   if (!ticketId) return;
 
-  const ticket = jugadasEnviadas.find(t => t.numero == ticketId);
-  if (!ticket) {
-    alert("❌ No se encontró el ticket.");
+  const vendedor = localStorage.getItem('claveVendedor');
+  if (!vendedor) {
+    alert("⚠️ No hay vendedor activo.");
     return;
   }
 
+  // 🔍 Intentar primero con las jugadas actuales
+  let ticket = window.jugadasEnviadas?.find(t => t.numero == ticketId);
+
+  // 🔁 Si no hay, intentar con las guardadas en memoria global
+  if (!ticket && window.jugadasEnviadasGlobal?.[vendedor]) {
+    const listaGlobal = window.jugadasEnviadasGlobal[vendedor];
+    ticket = listaGlobal.find(t => t.numero == ticketId);
+    console.log("🧠 Buscado en memoria global:", listaGlobal.length);
+  }
+
+  // 💾 Si tampoco, intentar con el localStorage
+  if (!ticket) {
+    try {
+      const cache = JSON.parse(localStorage.getItem('jugadasEnviadasGlobal') || '{}');
+      const listaStorage = cache[vendedor] || [];
+      ticket = listaStorage.find(t => t.numero == ticketId);
+      console.log("📦 Buscado en localStorage:", listaStorage.length);
+    } catch (e) {
+      console.warn("⚠️ No se pudo leer jugadas del localStorage", e);
+    }
+  }
+
+  if (!ticket) {
+    alert("❌ No se encontró el ticket.");
+    console.warn(`Ticket ${ticketId} no encontrado en ninguna fuente.`);
+    return;
+  }
+
+  console.log("✅ Ticket encontrado para repetir:", ticket);
   window.ticket = ticket;
 
   let loteriasSeleccionadas = Array.from(document.querySelectorAll('.casilla-sorteo.activo'))
@@ -1744,9 +2013,26 @@ function repetirJugadas() {
         jugadaClon._tr = tr;
   
         tr.querySelector('.eliminar').onclick = () => {
-          jugadasTemp = jugadasTemp.filter(jg => jg !== jugadaClon);
-          tr.remove();
-        };
+  console.log("🧹 [DEBUG] Antes de eliminar:", jugadasTemp.length, "jugadas");
+  console.log("🧾 Jugada a eliminar:", jugadaClon);
+
+  // Filtrar la jugada eliminada
+  jugadasTemp = jugadasTemp.filter(jg => jg !== jugadaClon);
+
+  // Actualizar global
+  window.jugadasTemp = jugadasTemp;
+
+  console.log("✅ [DEBUG] Después de eliminar:", window.jugadasTemp.length, "jugadas activas");
+  console.log("💰 [DEBUG] Total previo a recalcular:", document.getElementById('totalEnVivo')?.innerText);
+
+  // Eliminar fila visual
+  tr.remove();
+
+  // Recalcular total
+  actualizarTotalEnVivo();
+
+  console.log("💰 [DEBUG] Total después del recalculo:", document.getElementById('totalEnVivo')?.innerText);
+};
   
         tr.querySelector('.editar').onclick = () => {
           jugadasTemp.forEach(j => delete j._editando);
@@ -1782,6 +2068,7 @@ function repetirJugadas() {
         };
   
         document.getElementById('listaJugadas').appendChild(tr);
+        actualizarTotalEnVivo(); // 💰 recalcula total al agregar
         cantidadCargadas++;
         // Activar visualmente las casillas correspondientes en la grilla (respetando bloqueos)
 document.querySelectorAll('.casilla-sorteo').forEach(c => c.classList.remove('activo'));
@@ -1848,9 +2135,26 @@ jugadasTemp.forEach(j => {
     jugadaClon._tr = tr;
 
     tr.querySelector('.eliminar').onclick = () => {
-      jugadasTemp = jugadasTemp.filter(jg => jg !== jugadaClon);
-      tr.remove();
-    };
+  console.log("🧹 [DEBUG] Antes de eliminar:", jugadasTemp.length, "jugadas");
+  console.log("🧾 Jugada a eliminar:", jugadaClon);
+
+  // Filtrar la jugada eliminada
+  jugadasTemp = jugadasTemp.filter(jg => jg !== jugadaClon);
+
+  // Actualizar global
+  window.jugadasTemp = jugadasTemp;
+
+  console.log("✅ [DEBUG] Después de eliminar:", window.jugadasTemp.length, "jugadas activas");
+  console.log("💰 [DEBUG] Total previo a recalcular:", document.getElementById('totalEnVivo')?.innerText);
+
+  // Eliminar fila visual
+  tr.remove();
+
+  // Recalcular total
+  actualizarTotalEnVivo();
+
+  console.log("💰 [DEBUG] Total después del recalculo:", document.getElementById('totalEnVivo')?.innerText);
+};
 
     tr.querySelector('.editar').onclick = () => {
       jugadasTemp.forEach(j => delete j._editando);
@@ -2093,15 +2397,48 @@ aciertosGlobal = await resAciertos.json();
       console.error("❌ Error al consultar Supabase:", err);
       console.warn("⚠️ Ocurrió un problema al obtener las jugadas, pero se continúa sin romper:", err.message);
     }
+    // 🧩 Reasignar eventos a botones anular y ver después de renderizar
+setTimeout(() => {
+  document.querySelectorAll('.btn-anular').forEach(btn => {
+    btn.onclick = () => anularTicket(btn.dataset.id);
+  });
+  document.querySelectorAll('.btn-ver').forEach(btn => {
+    btn.onclick = () => verTicket(btn.dataset.id);
+  });
+}, 100);
   }
   
-  async function anularTicket(id) {
-    const vendedor = localStorage.getItem('claveVendedor');
-    const todo = JSON.parse(localStorage.getItem('jugadasEnviadasGlobal')) || {};
-    const ticketsPasador = todo[vendedor] || [];
-  
-    const ticket = ticketsPasador.find(t => t.id === id);
-    if (!ticket || ticket.anulado) return;
+ async function anularTicket(id) {
+  const vendedor = localStorage.getItem('claveVendedor');
+  let todo = JSON.parse(localStorage.getItem('jugadasEnviadasGlobal')) || {};
+  let ticketsPasador = todo[vendedor] || [];
+  let ticket = ticketsPasador.find(t => t.id === id);
+
+  // 🔍 Si no se encuentra localmente, buscarlo en la nube
+  if (!ticket) {
+    try {
+      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFnaXRoYmx1dHJraWJheWRqYnNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc3NTI4MzcsImV4cCI6MjA2MzMyODgzN30.pEzQkajudq4_rOpevqp8XUCLm4AUx_XOWgWwDdBczss';
+      const resp = await fetch(`https://agithblutrkibaydjbsl.supabase.co/rest/v1/jugadas_enviadas?id=eq.${id}`, {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        }
+      });
+      const data = await resp.json();
+      if (data && data.length > 0) {
+        ticket = data[0]; // ✅ usa el de la nube
+      } else {
+        alert("❌ No se encontró el ticket ni local ni en la nube.");
+        return;
+      }
+    } catch (err) {
+      console.error("🚨 Error buscando ticket en Supabase:", err);
+      alert("❌ No se pudo obtener el ticket desde la nube.");
+      return;
+    }
+  }
+
+  if (ticket.anulado) return;
   
     // ⏰ Verificamos si se puede anular según la hora
     const ahora = new Date();
@@ -2147,6 +2484,39 @@ aciertosGlobal = await resAciertos.json();
     }
   
     if (confirm(`¿Anular ticket #${ticket.numero || id}?`)) {
+      // 🧩 Primero intentamos anular directamente en Supabase (global)
+try {
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFnaXRoYmx1dHJraWJheWRqYnNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc3NTI4MzcsImV4cCI6MjA2MzMyODgzN30.pEzQkajudq4_rOpevqp8XUCLm4AUx_XOWgWwDdBczss';
+  const url = `https://agithblutrkibaydjbsl.supabase.co/rest/v1/jugadas_enviadas?id=eq.${id}`;
+
+  const resp = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify({
+      anulado: true,
+      total: 0
+    })
+  });
+
+  if (!resp.ok) {
+    const errorText = await resp.text();
+    console.error("❌ Error al actualizar en Supabase:", errorText);
+    alert("⛔ No se pudo anular el ticket en la nube.");
+    return; // 🚫 si falla la nube, no toques nada local
+  }
+
+  console.log("✅ Ticket anulado correctamente en Supabase (global).");
+
+} catch (err) {
+  console.error("❌ Error inesperado al anular en la nube:", err);
+  alert("⛔ Error inesperado al intentar anular en Supabase.");
+  return; // 🚫 aborta si falla la nube
+}
       ticket.anulado = true;
       ticket.total = 0;
   
@@ -2214,9 +2584,12 @@ aciertosGlobal = await resAciertos.json();
 if (!ticket) return;
 
 // Mostrar lo guardado. Si falta, intentar derivar de created_at. Nunca “ahora”.
+// ✅ Corregir visualización de fecha (sin desfase de día)
 const fecha = ticket.fecha
-  ? new Date(ticket.fecha).toLocaleDateString('es-AR')
-  : (ticket.created_at ? new Date(ticket.created_at).toLocaleDateString('es-AR') : '');
+  ? ticket.fecha.split('-').reverse().join('/')  // muestra tal cual se guardó
+  : (ticket.created_at
+      ? new Date(ticket.created_at).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })
+      : '');
 
 const hora  = ticket.hora
   ?? (ticket.created_at
@@ -2243,7 +2616,7 @@ ticket.jugadas.forEach(j => {
 });
 
 const ordenarLoterias = (lista) => {
-  const orden = ['NAC', 'PRO', 'SFE', 'COR', 'RIO', 'CTE', 'MZA', 'CHA', 'JUJ', 'SAN', 'MIS', 'ORO', 'TUC'];
+  const orden = ['NAC','PRO','SFE','COR','RIO','CTE','MZA','CHA','JUJ','SAN','NQN','CHB','RIN','LRJ','SAL','MIS','SCR','TUC','SGO','ORO'];
   return lista.sort((a, b) => orden.indexOf(a.slice(0, 3)) - orden.indexOf(b.slice(0, 3)));
 };
 
@@ -2469,7 +2842,9 @@ Object.freeze(nuevaJugada.loterias);
       };
     
       document.getElementById('listaJugadas').appendChild(tr);
-      return;
+// 💰 Recalcular total en vivo después de crear bajada
+actualizarTotalEnVivo();
+return;
     }
   
     // ENTER (normal o numérico) = salto entre campos o doble enter para arrancar desde grilla
@@ -3165,6 +3540,8 @@ setInterval(() => {
     // Limpiamos jugadasTemp y tabla visible
     jugadasTemp = [];
     const tabla = document.getElementById('listaJugadas');
+    window.jugadasTemp = [];
+actualizarTotalEnVivo(); // 💰 limpia visual después de enviar
     if (tabla) tabla.innerHTML = '';
 
     // Actualizamos fecha visible si hace falta
@@ -3377,6 +3754,8 @@ document.addEventListener('click', (e) => {
   if (confirm("¿Vaciar todas las jugadas cargadas?")) {
     jugadasTemp = [];
     const lista = document.getElementById('listaJugadas');
+    window.jugadasTemp = [];
+actualizarTotalEnVivo(); // 💰 limpia visual después de enviar
     if (lista) lista.innerHTML = '';
   }
 });
