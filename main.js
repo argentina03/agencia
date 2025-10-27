@@ -114,9 +114,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // 🔄 Cargar todas las jugadas de la nube apenas inicia el panel
 setTimeout(() => {
   try {
-    vendedor = localStorage.getItem('claveVendedor'); // 🔒 aseguramos el pasador activo
+    vendedor = localStorage.getItem('claveVendedor');
     if (vendedor && vendedor !== 'SIN_VENDEDOR') {
-      cargarJugadasDesdeNube(true);
+      if (!window._cargandoJugadas) {
+        window._cargandoJugadas = true;
+        cargarJugadasDesdeNube(true)
+          .finally(() => {
+            window._cargandoJugadas = false;
+          });
+      }
     } else {
       console.warn('⚠️ No se cargaron jugadas: vendedor no definido aún.');
     }
@@ -313,6 +319,44 @@ async function obtenerJugadasDesdeSupabase(diasAtras = 15) {
 
   return data;
 }
+// === 🔍 Restaurar búsqueda de ticket global (para botón Repetir) ===
+async function buscarTicketPorNumero(ticket) {
+  const vendedor = localStorage.getItem('claveVendedor');
+  if (!vendedor) return null;
+
+  // 1️⃣ Buscar en cache local
+  try {
+    const globalData = JSON.parse(localStorage.getItem('jugadasEnviadasGlobal') || '{}');
+    const jugadasLocal = globalData[vendedor] || [];
+    const encontrada = jugadasLocal.find(j => j.ticket == ticket);
+    if (encontrada) return encontrada;
+  } catch (e) {
+    console.warn("⚠️ No se pudo leer cache local:", e);
+  }
+
+  // 2️⃣ Buscar directamente en la nube
+  try {
+    const { data, error } = await supabase
+  .from("jugadas_enviadas")
+  .select("*")
+  .eq("numero", ticket)
+  .maybeSingle();
+
+    if (error) {
+      console.error("❌ Error buscando ticket en Supabase:", error);
+      return null;
+    }
+    if (data) {
+      console.log(`✅ Ticket #${ticket} encontrado en la nube.`);
+      return data;
+    }
+  } catch (e) {
+    console.warn("⚠️ Excepción en búsqueda remota:", e);
+  }
+
+  console.warn(`❌ Ticket #${ticket} no encontrado.`);
+  return null;
+}
 async function cargarJugadasDesdeNube(forzar = false) {
   const contenedor = document.getElementById("tablaEnviadas");
 
@@ -354,10 +398,20 @@ async function cargarJugadasDesdeNube(forzar = false) {
     window.jugadasEnviadasGlobal[vendedorActivo] = data || [];
     localStorage.setItem('jugadasEnviadasGlobal', JSON.stringify(window.jugadasEnviadasGlobal));
 
-    console.log(`✅ Jugadas cargadas (${data.length}) para el vendedor ${vendedorActivo}`);
+      console.log(`✅ Jugadas cargadas (${data.length}) para el vendedor ${vendedorActivo}`);
 
-    // 🎯 Mostrar solo las del día actual después de guardar todo
+// 🕐 Esperar a que los datos estén realmente disponibles antes de mostrar
+let intentos = 0;
+const verificarYFiltrar = setInterval(() => {
+  if (window.jugadasEnviadas && window.jugadasEnviadas.length > 0) {
+    clearInterval(verificarYFiltrar);
     filtrarSoloHoy();
+  } else if (++intentos > 10) { // ⏱️ Máximo 10 intentos (~1 segundo)
+    clearInterval(verificarYFiltrar);
+    console.warn("⚠️ No se encontraron jugadas aún, mostrando vacío.");
+    filtrarSoloHoy();
+  }
+}, 100);
   } catch (err) {
     console.error("❌ Error al cargar jugadas:", err);
     const tbody = document.getElementById('tablaEnviadas');
@@ -380,7 +434,14 @@ function filtrarSoloHoy() {
   const hoy = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().split("T")[0];
   const jugadasHoy = (window.jugadasEnviadas || []).filter(j => j.fecha === hoy);
 
+  // 🧠 Si ya hay jugadas en pantalla, no limpiar aunque se dispare otra vez
   if (jugadasHoy.length === 0) {
+    const yaHayFilas = tbody.querySelectorAll('tr').length > 1;
+    if (yaHayFilas) {
+      console.log("⏸️ Ya hay jugadas visibles, no limpiar tabla.");
+      return;
+    }
+
     tbody.innerHTML = `
       <tr>
         <td colspan="6" style="padding:30px;text-align:center;color:#999;background:#111;">
@@ -391,7 +452,7 @@ function filtrarSoloHoy() {
     return;
   }
 
-  // Usamos tu render actual sin romperlo
+  // ✅ Si sí hay jugadas, renderizar normalmente
   renderizarFiltradas(jugadasHoy);
 
   const totalHoy = jugadasHoy
@@ -1907,9 +1968,18 @@ actualizarTotalEnVivo();
     };
   }
 // 🔄 BOTÓN REPETIR – SIEMPRE ACTIVO Y ADAPTABLE
-function repetirJugadas() {
+async function repetirJugadas() {
   console.log("🔁 Ejecutando repetirJugadas()");
 
+  // 🧹 Reiniciar jugadas temporales para evitar duplicados o residuos
+  jugadasTemp = [];
+window.jugadasTemp = jugadasTemp; // <- misma referencia, no otro array
+
+  // Reiniciar la tabla visual y el total
+  const tbody = document.getElementById('listaJugadas');
+  if (tbody) tbody.innerHTML = "";
+  const totalLabel = document.getElementById('totalEnVivo');
+  if (totalLabel) totalLabel.innerText = "Total: $0";
   const ticketId = prompt("¿Qué número de ticket querés repetir?");
   if (!ticketId) return;
 
@@ -1919,27 +1989,8 @@ function repetirJugadas() {
     return;
   }
 
-  // 🔍 Intentar primero con las jugadas actuales
-  let ticket = window.jugadasEnviadas?.find(t => t.numero == ticketId);
-
-  // 🔁 Si no hay, intentar con las guardadas en memoria global
-  if (!ticket && window.jugadasEnviadasGlobal?.[vendedor]) {
-    const listaGlobal = window.jugadasEnviadasGlobal[vendedor];
-    ticket = listaGlobal.find(t => t.numero == ticketId);
-    console.log("🧠 Buscado en memoria global:", listaGlobal.length);
-  }
-
-  // 💾 Si tampoco, intentar con el localStorage
-  if (!ticket) {
-    try {
-      const cache = JSON.parse(localStorage.getItem('jugadasEnviadasGlobal') || '{}');
-      const listaStorage = cache[vendedor] || [];
-      ticket = listaStorage.find(t => t.numero == ticketId);
-      console.log("📦 Buscado en localStorage:", listaStorage.length);
-    } catch (e) {
-      console.warn("⚠️ No se pudo leer jugadas del localStorage", e);
-    }
-  }
+    // 🧠 Buscar ticket en cualquier fuente (local o nube)
+  const ticket = await buscarTicketPorNumero(ticketId);
 
   if (!ticket) {
     alert("❌ No se encontró el ticket.");
@@ -2186,9 +2237,18 @@ jugadasTemp.forEach(j => {
     };
 
     document.getElementById('listaJugadas').appendChild(tr);
+    actualizarTotalEnVivo(); // 💰 recalcula el total inmediatamente al agregar la fila
   });
 
-  alert("✅ Ticket repetido correctamente");
+ // ✅ Ticket repetido correctamente
+alert("✅ Ticket repetido correctamente");
+// 💰 Mostrar el total correcto del ticket repetido
+window.jugadasTemp = jugadasTemp;
+if (ticket.total) {
+  document.getElementById('totalEnVivo').innerText = `Total: $${Number(ticket.total).toLocaleString('es-AR')}`;
+} else {
+  actualizarTotalEnVivo();
+}
 }
 function mostrarJugadasEnviadas() {
   const contenido = document.getElementById('contenidoPrincipal');

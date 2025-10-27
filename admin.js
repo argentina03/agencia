@@ -489,6 +489,23 @@ async function cargarAuditoriaEnUI() {
 // ==========================
 // RESULTADOS — UI compacta (carga + tablero + modal)
 // ==========================
+
+function _minutosDe(hhmm) {
+  const [h, m] = String(hhmm).trim().split(':').map(Number);
+  return h * 60 + m;
+}
+
+function _ahoraBuenosAiresEnMin() {
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(new Date()); // ej "12:05"
+  const [h, m] = fmt.split(':').map(Number);
+  return h * 60 + m;
+}
+
 async function mostrarResultados() {
   const zona = document.getElementById("zonaContenido");
   const hoy = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -716,12 +733,31 @@ document.getElementById('res-grid').innerHTML = filas.join('');
   // Después de construir LOTS (desde lotCfg)
 const selSig = document.getElementById('res-sigla');
 const selHor = document.getElementById('res-hora');
-const cargarHorarios = (sig) => {
-  const lot = (JSON.parse(localStorage.getItem('loteriasConfig')||'[]')).find(x => x.sigla === sig);
-  const hs = lot ? lot.horarios : [];
+ function cargarHorarios(sig) {
+  const lotCfgLoc = JSON.parse(localStorage.getItem('loteriasConfig') || '[]');
+  const lot = lotCfgLoc.find(x => x.sigla === sig);
+  const hs  = lot ? lot.horarios : [];
+
+  // poblar el select de horarios
   selHor.innerHTML = hs.map(h => `<option value="${h}">${h}</option>`).join('');
-  if (hs.length) selHor.value = hs[0];
-};
+
+  // preseleccionar el último horario ya pasado (BA)
+  if (hs.length) {
+    const ahora = _ahoraBuenosAiresEnMin();
+    let bestIdx = -1, bestMin = -1;
+    hs.forEach((h, i) => {
+      const mins = _minutosDe(h);
+      if (Number.isFinite(mins) && mins <= ahora && mins >= bestMin) {
+        bestMin = mins; bestIdx = i;
+      }
+    });
+    if (bestIdx === -1) bestIdx = hs.length - 1; // si no pasó ninguno aún, dejar el último
+    selHor.selectedIndex = bestIdx;
+  }
+}
+
+cargarHorarios(selSig.value);
+selSig.addEventListener('change', () => cargarHorarios(selSig.value));
 cargarHorarios(selSig.value);
 selSig.addEventListener('change', () => cargarHorarios(selSig.value));
 
