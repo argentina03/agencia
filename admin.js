@@ -2682,10 +2682,17 @@ const { data: tickets, error } = await supabase
     if (!Array.isArray(jugadas)) return;
 
     jugadas.forEach(j => {
-      if (!j?.loterias) return;
+  if (!j?.loterias) return;
 
-      j.loterias.forEach(cod => {
-        if (cod !== claveLoteria) return;
+  // 🛠️ Fix: asegurar que siempre sea array real, no texto
+  if (typeof j.loterias === 'string') {
+    try { j.loterias = JSON.parse(j.loterias); } 
+    catch { j.loterias = [j.loterias]; }
+  }
+  if (!Array.isArray(j.loterias)) j.loterias = [j.loterias];
+
+  j.loterias.forEach(cod => {
+    if (cod !== claveLoteria) return;
 // ⚙️ compat nombres (por si algún ticket viejo vino con numeroR/posicionR)
 if (j.numeroR && !j.redoblona) j.redoblona = j.numeroR;
 if (j.posicionR && !j.posRedoblona) j.posRedoblona = j.posicionR;
