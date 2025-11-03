@@ -339,6 +339,7 @@ async function buscarTicketPorNumero(ticket) {
     const { data, error } = await supabase
   .from("jugadas_enviadas")
   .select("*")
+  .eq("vendedor", vendedor)   // ← filtro clave: busca solo en su propio vendedor
   .eq("numero", ticket)
   .maybeSingle();
 
