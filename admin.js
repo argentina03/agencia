@@ -882,7 +882,19 @@ const { data, error } = await q;
   
     const rows = data || [];
     const total = rows.reduce((s, r) => s + (Number(r.acierto)||0), 0);
-  
+  // 🔽 ORDENAR POR HORARIO (lotería) + NÚMERO DE TICKET
+rows.sort((a, b) => {
+  // Extraer la hora (los números dentro del texto de la lotería, ej: "NAC10")
+  const horaA = a.loteria.match(/\d+/) ? parseInt(a.loteria.match(/\d+/)[0]) : 0;
+  const horaB = b.loteria.match(/\d+/) ? parseInt(b.loteria.match(/\d+/)[0]) : 0;
+  if (horaA !== horaB) return horaA - horaB;
+
+  // Agrupar por ticket (id_ticket)
+  if (a.id_ticket !== b.id_ticket) return a.id_ticket - b.id_ticket;
+
+  // Luego por nombre de lotería (alfabéticamente)
+  return a.loteria.localeCompare(b.loteria);
+});
     if (spanC) spanC.textContent = `${rows.length} acierto(s)`;
     if (spanT) spanT.textContent = `Total: ${formatARS(total)}`;
     if (msg)   msg.textContent = rows.length ? '' : 'Sin aciertos';
@@ -1295,14 +1307,14 @@ async function mostrarCargaJugadasAdmin() {
         <div class="seccion">
           <h3>Jugadas</h3>
           <div class="jugada-inputs">
-            <input type="text" id="numAdmin" placeholder="Número" maxlength="4">
-            <input type="text" id="posAdmin" placeholder="Posición">
-            <input type="text" id="impAdmin" placeholder="Importe">
+            <input type="text" id="numAdmin" placeholder="Número" maxlength="4" autocomplete="off">
+            <input type="text" id="posAdmin" placeholder="Posición" autocomplete="off">
+            <input type="text" id="impAdmin" placeholder="Importe" autocomplete="off">
           </div>
           <h3>Redoblona</h3>
           <div class="jugada-inputs">
-            <input type="text" id="numrAdmin" placeholder="Número">
-            <input type="text" id="posrAdmin" placeholder="Posición">
+            <input type="text" id="numrAdmin" placeholder="Número" autocomplete="off">
+            <input type="text" id="posrAdmin" placeholder="Posición" autocomplete="off">
           </div>
           <button class="btn-jugar" id="btnAgregarAdmin">Agregar Apuesta</button>
         </div>
@@ -1322,8 +1334,10 @@ async function mostrarCargaJugadasAdmin() {
           </table>
           <!-- ⬇ Preview de ticket (solo Admin) -->
 <div id="previewTicketAdminBox" style="margin-top:16px"></div>
+<h3 id="totalAdmin" style="text-align:center;color:#fff;margin-top:10px">TOTAL: $0</h3>
           <div style="display:flex;gap:16px;justify-content:center;align-items:center;margin-top:10px">
             <button class="btn-repetir" id="btnRepetirAdmin">🔄 Repetir</button>
+            <button class="btn-repetir" id="btnRepetirAdminMonto">💰 Repetir</button>
             <button class="btn-vaciar"  id="btnVaciarAdmin">🗑 Vaciar</button>
             <button class="btn-enviar"  id="btnEnviarAdmin">✅ Enviar</button>
           </div>
@@ -1351,7 +1365,24 @@ if (!document.getElementById('carga-admin-css')) {
       background:#111; border:1px solid #444; border-radius:6px;
       padding:6px 10px; cursor:pointer;
     }
-
+/* 💵 Botón Repetir con Monto (azul pro) */
+#btnRepetirAdminMonto {
+  background: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,123,255,.4);
+  transition: all .2s ease;
+}
+#btnRepetirAdminMonto:hover {
+  background: #1990ff;
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0,150,255,.6);
+}
     /* 🔹 Agrandar botones Repetir, Vaciar y Enviar */
     #btnRepetirAdmin,
     #btnVaciarAdmin,
@@ -1380,8 +1411,13 @@ if (!document.getElementById('carga-admin-css')) {
 window.jugadasTempAdmin = [];
 
   document.getElementById('btnRepetirAdmin').onclick = repetirJugadasAdmin;
-  document.getElementById('btnVaciarAdmin').onclick  = ()=>{ window.jugadasTempAdmin=[]; document.getElementById('listaJugadasAdmin').innerHTML=''; };
+  document.getElementById('btnVaciarAdmin').onclick = ()=>{
+  window.jugadasTempAdmin = [];
+  document.getElementById('listaJugadasAdmin').innerHTML = '';
+  actualizarTotalEnVivoAdmin();
+};
   document.getElementById('btnEnviarAdmin').onclick  = enviarTicketAdmin;
+  document.getElementById('btnRepetirAdminMonto').onclick = repetirJugadasAdminConMonto;
 }
 
 // ====== Pasadores dinámicos (filtrados por rol) ======
@@ -1755,6 +1791,7 @@ function bajarYAgregarDesdeUltimaJugada(){
   tr.querySelector('.eliminar').onclick = () => {
     window.jugadasTempAdmin = window.jugadasTempAdmin.filter(x => x !== nuevaJugada);
     tr.remove();
+      actualizarTotalEnVivoAdmin();
   };
   tbody.appendChild(tr);
 }
@@ -1933,11 +1970,12 @@ const jug = {
       <td>${jug.posRedoblona||'-'}</td>
       <td>${jug.loterias.length}</td>
       <td>$${jug.importe.toLocaleString('es-AR')}</td>
-      <td><button class='editar'>📝</button><button class='eliminar'>❌</button></td>
+      <td><button class='editar'>❌</button><button class='eliminar'>❌</button></td>
     `;
     tr.querySelector('.eliminar').onclick = ()=>{
       window.jugadasTempAdmin = window.jugadasTempAdmin.filter(x=>x!==jug);
       tr.remove();
+        actualizarTotalEnVivoAdmin();
     };
     tr.querySelector('.editar').onclick = ()=>{
       inputs[0].value = jug.numero;
@@ -1947,12 +1985,13 @@ const jug = {
       inputs[4].value = jug.posRedoblona||'';
       window.jugadasTempAdmin = window.jugadasTempAdmin.filter(x=>x!==jug);
       tr.remove();
+        actualizarTotalEnVivoAdmin(); // 🟢 agregado
       inputs[0].focus(); inputs[0].select();
     };
 
     window.jugadasTempAdmin.push(jug);
     document.getElementById('listaJugadasAdmin').appendChild(tr);
-
+actualizarTotalEnVivoAdmin();
     // limpiar
     inputs[0].value=''; inputs[1].value='1'; inputs[3].value=''; inputs[4].value='';
     inputs[2].focus(); inputs[2].select();
@@ -1964,8 +2003,15 @@ function repetirJugadasAdmin(){
   const ticketId = prompt('¿Qué número de ticket querés repetir?');
   if (!ticketId) return;
 
-  supabase.from('jugadas_enviadas').select('*').eq('numero', Number(ticketId)).maybeSingle()
-  .then(({data, error})=>{
+  const pasadorSel = document.getElementById('selectPasadorAdmin')?.value || '';
+if (!pasadorSel) return alert('Seleccioná un pasador antes de repetir un ticket');
+
+supabase.from('jugadas_enviadas')
+  .select('*')
+  .eq('numero', Number(ticketId))
+  .eq('vendedor', pasadorSel) // 🔹 filtra también por pasador
+  .maybeSingle()
+  .then(({ data, error }) => {
     if (error){ console.error(error); alert('Error buscando ticket'); return; }
     if (!data){ alert('No se encontró el ticket'); return; }
 
@@ -2004,11 +2050,132 @@ function repetirJugadasAdmin(){
         tr.remove();
       };
       document.getElementById('listaJugadasAdmin').appendChild(tr);
+      actualizarTotalEnVivoAdmin();
     });
 
     alert('✅ Ticket repetido');
   });
 }
+async function repetirJugadasAdminConMonto() {
+  const ticketId = prompt("¿Qué número de ticket querés repetir?");
+  if (!ticketId) return;
+
+  const pasadorSel = document.getElementById('selectPasadorAdmin')?.value || '';
+  if (!pasadorSel) return alert('Seleccioná un pasador antes de repetir un ticket.');
+
+  // 🔒 Buscar solo tickets del pasador actual
+  const { data: ticket, error } = await supabase
+    .from('jugadas_enviadas')
+    .select('*')
+    .eq('numero', Number(ticketId))
+    .eq('vendedor', pasadorSel)
+    .maybeSingle();
+
+  if (error || !ticket) {
+    alert("❌ No se encontró el ticket o pertenece a otro pasador.");
+    console.error(error);
+    return;
+  }
+
+  const nuevoMonto = Number(prompt("💵 Ingresá el nuevo importe por jugada (ej: 50):"));
+  if (!nuevoMonto || nuevoMonto <= 0) {
+    alert("Importe inválido.");
+    return;
+  }
+
+  // 🕒 Hora actual ARG
+  const ahora = new Date();
+  const ahoraArg = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+  const horaActual = ahoraArg.getHours() * 60 + ahoraArg.getMinutes();
+
+  // 🎯 Si el admin seleccionó loterías manualmente → usar esas
+  let seleccion = [...document.querySelectorAll('.casilla-sorteo-admin.activo')]
+    .map(c => c.dataset.lot + c.dataset.horario.split(':')[0].padStart(2,'0'));
+
+  // 🧩 Si no seleccionó nada → usar las originales pero filtradas según horario abierto
+  if (seleccion.length === 0) {
+    const abiertas = [];
+
+    (ticket.loterias || []).forEach(code => {
+      const pref = code.slice(0, 3);
+      const hh = code.slice(3);
+      const lista = loterias[pref];
+      if (!lista) return;
+
+      const [hor, min] = hh.length === 4 ? [hh.slice(0,2), hh.slice(2)] : [hh, "00"];
+      const minutosSorteo = parseInt(hor) * 60 + parseInt(min);
+      const sigueAbierto = horaActual < (minutosSorteo - 1);
+
+      if (sigueAbierto) {
+        abiertas.push(code);
+      } else {
+        // buscar el próximo horario disponible del mismo tipo
+        const proximo = lista.find(horario => {
+          const [h, m] = horario.split(':').map(Number);
+          const minTot = h * 60 + m;
+          return minTot > horaActual;
+        });
+        if (proximo) abiertas.push(pref + proximo.split(':')[0].padStart(2, '0'));
+      }
+    });
+
+    seleccion = abiertas;
+
+    // ⚙️ Actualizar visual
+    document.querySelectorAll('.casilla-sorteo-admin').forEach(c => c.classList.remove('activo'));
+    seleccion.forEach(code => {
+      const sig = code.slice(0, 3);
+      const hh = code.slice(3);
+      const cel = document.querySelector(`.casilla-sorteo-admin[data-lot="${sig}"][data-horario^="${hh}"]`);
+      if (cel) cel.classList.add('activo');
+    });
+
+    if (seleccion.length === 0) {
+      alert("⛔ Todas las loterías del ticket ya cerraron por hoy.");
+      return;
+    }
+  }
+
+  // 🧹 Limpiar jugadas actuales
+  window.jugadasTempAdmin = [];
+  const tbody = document.getElementById('listaJugadasAdmin');
+  if (tbody) tbody.innerHTML = '';
+
+  // ♻️ Cargar jugadas repetidas con el nuevo monto
+  (ticket.jugadas || []).forEach(j => {
+    const jug = {
+      numero: j.numero,
+      posicion: j.posicion,
+      importe: nuevoMonto,
+      redoblona: j.redoblona,
+      posRedoblona: j.posRedoblona,
+      loterias: [...seleccion]
+    };
+
+    window.jugadasTempAdmin.push(jug);
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${jug.numero}</td>
+      <td>${jug.posicion}</td>
+      <td>${jug.redoblona || '-'}</td>
+      <td>${jug.posRedoblona || '-'}</td>
+      <td>${jug.loterias.length}</td>
+      <td>$${jug.importe.toLocaleString('es-AR')}</td>
+      <td><button class='eliminar'>❌</button></td>
+    `;
+    tr.querySelector('.eliminar').onclick = () => {
+      window.jugadasTempAdmin = window.jugadasTempAdmin.filter(x => x !== jug);
+      tr.remove();
+        actualizarTotalEnVivoAdmin();
+    };
+    tbody.appendChild(tr);
+  });
+
+  alert(`✅ Ticket #${ticketId} repetido con importe $${nuevoMonto}`);
+  actualizarTotalEnVivoAdmin();
+}
+
 // === Helpers UI ADMIN – Monto Total & Dividir ===
 
 // Estado persistido SOLO para admin (claves distintas del panel)
@@ -2406,7 +2573,17 @@ if (ticket.id) {
     if (uuidBox) uuidBox.textContent = ticket.id;
   }, 30);
 }
+// 🔄 limpiar selección y campos después de enviar ticket
+  try {
+    document.querySelectorAll('.casilla-sorteo-admin.activo').forEach(c => c.classList.remove('activo'));
+    document.querySelectorAll('.jugada-inputs input').forEach(inp => inp.value = '');
+    const lista = document.getElementById('listaJugadasAdmin');
+    if (lista) lista.innerHTML = '';
+  } catch (e) {
+    console.warn('⚠️ Error limpiando la interfaz después de enviar el ticket:', e);
+  }
 }
+
 // ====== HTML del ticket (Admin) para overlay ======
 function renderTicketHTMLAdmin(ticket) {
   const { numero, fecha, hora, vendedor, jugadas = [], total } = ticket;
@@ -6293,3 +6470,30 @@ window.toggleBloqueoAdmin = toggleBloqueoAdmin;
   window.addEventListener('resize', ensure);
   window.addEventListener('orientationchange', ensure);
 })();
+
+// ====== Total en vivo (ADMIN) ======
+function actualizarTotalEnVivoAdmin() {
+  const totalDiv = document.getElementById('totalAdmin');
+  if (!totalDiv) return;
+
+  if (!window.jugadasTempAdmin || window.jugadasTempAdmin.length === 0) {
+    totalDiv.innerText = "TOTAL: $0";
+    return;
+  }
+
+  let total = 0;
+  window.jugadasTempAdmin.forEach(j => {
+    const cantidadLoterias = Array.isArray(j.loterias) ? j.loterias.length : 1;
+    const importe = Number(j.importe || 0);
+    total += importe * cantidadLoterias;
+  });
+
+  totalDiv.innerText = `TOTAL: $${total.toLocaleString('es-AR')}`;
+}
+// 🔁 Refresco automático del total si cambia jugadasTempAdmin
+const _origPush = Array.prototype.push;
+Array.prototype.push = function(...args) {
+  const result = _origPush.apply(this, args);
+  if (this === window.jugadasTempAdmin) actualizarTotalEnVivoAdmin();
+  return result;
+};

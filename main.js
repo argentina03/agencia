@@ -813,6 +813,15 @@ async function enviarTicket() {
 
   try {
     // 🧩 tu código normal va acá
+    // 💾 Si hay jugadas pendientes (de repetir con monto), las recuperamos
+if ((!window.jugadasTemp || window.jugadasTemp.length === 0) && localStorage.getItem('jugadasPendientes')) {
+  try {
+    window.jugadasTemp = JSON.parse(localStorage.getItem('jugadasPendientes')) || [];
+    console.log("♻️ Jugadas recuperadas del localStorage:", window.jugadasTemp);
+  } catch (e) {
+    console.error("⚠️ Error al recuperar jugadasPendientes:", e);
+  }
+}
     const jugadas = document.querySelectorAll('#listaJugadas tr');
     if (jugadas.length === 0) return alert('No hay jugadas cargadas');
 
@@ -825,9 +834,38 @@ if (usarMontoTotal && !(montoTotalDeseado > 0)) {
   alert('Activaste "Monto total" pero no capturaste el importe total (primer importe).');
   return;
 }
-const jugadasFuente = usarMontoTotal
-  ? prorratearMontoTotal(jugadasTemp, montoTotalDeseado)
-  : jugadasTemp;
+// ✅ Asegurar que existan jugadas, combinando repetidas + nuevas
+let jugadasFuente = [];
+
+// 1️⃣ Si hay jugadas nuevas cargadas (manuales o normales)
+if (window.jugadasTemp?.length > 0) {
+  jugadasFuente = [...window.jugadasTemp];
+}
+
+// 2️⃣ Si hay jugadas pendientes (repetidas con monto)
+try {
+  const pendientes = JSON.parse(localStorage.getItem('jugadasPendientes') || '[]');
+  if (pendientes.length > 0) {
+    // 🔁 Combina ambas listas sin duplicados exactos
+    const combinadas = [...pendientes];
+    jugadasFuente.forEach(j => {
+      const duplicada = combinadas.some(p =>
+        p.numero === j.numero &&
+        p.posicion === j.posicion &&
+        JSON.stringify(p.loterias) === JSON.stringify(j.loterias)
+      );
+      if (!duplicada) combinadas.push(j);
+    });
+    jugadasFuente = combinadas;
+    console.log("✅ Jugadas combinadas (pendientes + nuevas):", jugadasFuente);
+  }
+} catch (e) {
+  console.warn("⚠️ Error leyendo jugadasPendientes:", e);
+}
+
+if (usarMontoTotal) {
+  jugadasFuente = prorratearMontoTotal(jugadasFuente, montoTotalDeseado);
+}
 // === FIN BLOQUE ===
 
 
@@ -978,6 +1016,9 @@ if (window.__MTicket) {
 
 desactivarMontoTotal();   // UI a gris si existe el botón
 desactivarDividirMonto(); // UI a gris si existe el botón
+
+// 🧹 Limpia jugadas repetidas temporales para evitar mezclas viejas
+localStorage.removeItem('jugadasPendientes');
   } finally {
     // ✅ Esto se ejecuta SIEMPRE, aunque haya error o alert
     if (botonEnviar) {
@@ -1123,7 +1164,6 @@ function mostrarSeccion(seccion) {
           <span><i class="fa fa-user"></i> ${vendedor}</span>
         </div>
         <div class="atajos-info">
-          <span>X = Por Afuera</span>
           <span>↑ = Posición</span>
           <span>Enter = Tab</span>
           <span>+ = Hacer bajada</span>
@@ -1250,6 +1290,19 @@ function mostrarSeccion(seccion) {
     cursor: pointer;
   ">🔄 Repetir</button>
 
+  <button class="btn-repetir" id="btnRepetirMonto" style="
+    font-size: 16px;
+    padding: 10px 24px;
+    border-radius: 6px;
+    height: 48px;
+    min-width: 130px;
+    font-weight: bold;
+    background-color: #2980b9;
+    color: white;
+    border: none;
+    cursor: pointer;
+  ">💰 Repetir </button>
+
   <button class="btn-vaciar" id="btnVaciar" style="
     font-size: 16px;
     padding: 10px 24px;
@@ -1294,7 +1347,15 @@ if (typeof setupDividirMontoUI === 'function') setupDividirMontoUI();
         console.log("🔘 Click en botón Repetir");
         repetirJugadas();
       });
-    } else {
+    }
+    const btnRepetirMonto = document.getElementById("btnRepetirMonto");
+if (btnRepetirMonto) {
+  btnRepetirMonto.addEventListener("click", () => {
+    console.log("💰 Click en botón Repetir con Monto");
+    repetirJugadasConMonto();
+  });
+}
+    else {
       console.warn("⛔ No se encontró el botón #btnRepetir");
     }
 
@@ -1546,7 +1607,7 @@ case 'perfil':
     <div style="max-width:480px; margin:0 auto; background:#111; padding:30px; border-radius:12px; box-shadow: 0 0 12px rgba(0,0,0,0.6)">
       <div style="margin-bottom:20px">
         <label style="color:#ccc; font-weight:bold; display:block; margin-bottom:6px;">Usuario:</label>
-        <input type="text" value="2323" disabled style="width:100%; padding:12px; background:#222; color:#0f0; border:none; border-radius:6px; font-size:16px">
+        <input id="usuarioPerfil" type="text" disabled style="width:100%; padding:12px; background:#222; color:#0f0; border:none; border-radius:6px; font-size:16px">
       </div>
 
       <div style="margin-bottom:20px">
@@ -1570,6 +1631,23 @@ case 'perfil':
       </div>
     </div>
   `;
+  
+  // 🟢 Mostrar el usuario real del localStorage
+  setTimeout(() => {
+    const campoUsuario = document.getElementById('usuarioPerfil');
+    if (!campoUsuario) return;
+
+    // Obtiene el usuario logueado actual
+    const usuarioActual = localStorage.getItem('usuario') || localStorage.getItem('claveVendedor') || '';
+    if (usuarioActual) {
+      campoUsuario.value = usuarioActual;
+      campoUsuario.style.color = '#00ff00';
+    } else {
+      campoUsuario.value = 'No detectado';
+      campoUsuario.style.color = '#ff4444';
+    }
+  }, 150);
+
   break;
   
     default:
@@ -2251,6 +2329,137 @@ if (ticket.total) {
   actualizarTotalEnVivo();
 }
 }
+
+// ====== Repetir ticket con MONTO NUEVO (ajustada con filtros y loterías) ======
+async function repetirJugadasConMonto() {
+  const ticketId = prompt("¿Qué número de ticket querés repetir?");
+  if (!ticketId) return;
+
+  const vendedor = localStorage.getItem('claveVendedor') || '';
+  if (!vendedor) {
+    alert("No se detectó el pasador activo.");
+    return;
+  }
+
+  // 🔒 solo busca tickets del mismo pasador
+  const { data: ticket, error } = await supabase
+    .from('jugadas_enviadas')
+    .select('*')
+    .eq('numero', Number(ticketId))
+    .eq('vendedor', vendedor)
+    .maybeSingle();
+
+  if (error || !ticket) {
+    alert("❌ No se encontró el ticket o pertenece a otro pasador.");
+    console.error(error);
+    return;
+  }
+
+  const nuevoMonto = Number(prompt("💵 Ingresá el nuevo importe por jugada"));
+  if (!nuevoMonto || nuevoMonto <= 0) {
+    alert("Importe inválido.");
+    return;
+  }
+
+  // 🕒 Hora actual en Argentina
+  const ahora = new Date();
+  const ahoraArg = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+  const horaActual = ahoraArg.getHours() * 60 + ahoraArg.getMinutes();
+
+  // 🎯 Loterías seleccionadas manualmente (si las hay)
+  let seleccion = [...document.querySelectorAll('.casilla-sorteo.activo')]
+    .map(c => c.dataset.lot + c.dataset.horario.split(':')[0].padStart(2,'0'));
+
+  // 🧩 Si no se seleccionó ninguna → usar las del ticket, pero filtradas por horario abierto
+  if (seleccion.length === 0) {
+    const lotOriginales = ticket.loterias || [];
+
+    const abiertas = [];
+
+    for (const codigo of lotOriginales) {
+      const pref = codigo.slice(0, 3);
+      const hh = codigo.slice(3);
+      const lista = loterias[pref];
+      if (!lista) continue;
+
+      // Chequear si el horario original sigue abierto
+      const [hor, min] = hh.length === 4 ? [hh.slice(0,2), hh.slice(2)] : [hh, "00"];
+      const minutosSorteo = parseInt(hor) * 60 + parseInt(min);
+      const sigueAbierto = horaActual < (minutosSorteo - 1);
+
+      if (sigueAbierto) {
+        abiertas.push(codigo);
+      } else {
+        // buscar el siguiente horario disponible del mismo tipo
+        const proximo = lista.find(horario => {
+          const [h, m] = horario.split(':').map(Number);
+          const minTot = h * 60 + m;
+          return minTot > horaActual;
+        });
+        if (proximo) abiertas.push(pref + proximo.split(':')[0].padStart(2,'0'));
+      }
+    }
+
+    seleccion = abiertas;
+
+    // 🔄 actualizar visualmente los botones de sorteos
+    document.querySelectorAll('.casilla-sorteo').forEach(c => c.classList.remove('activo'));
+    seleccion.forEach(code => {
+      const sig = code.slice(0, 3);
+      const hh = code.slice(3);
+      const cel = document.querySelector(`.casilla-sorteo[data-lot="${sig}"][data-horario^="${hh}"]`);
+      if (cel) cel.classList.add('activo');
+    });
+  }
+
+  // 🧹 Limpiar jugadas actuales
+  window.jugadasTemp = [];
+  const tbody = document.getElementById('listaJugadas');
+  if (tbody) tbody.innerHTML = '';
+
+  // ♻️ Cargar jugadas repetidas con el nuevo monto
+  (ticket.jugadas || []).forEach(j => {
+    const jug = {
+      numero: j.numero,
+      posicion: j.posicion,
+      importe: nuevoMonto,
+      redoblona: j.redoblona,
+      posRedoblona: j.posRedoblona,
+      loterias: [...seleccion]
+    };
+
+    window.jugadasTemp.push(jug);
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${jug.numero}</td>
+      <td>${jug.posicion}</td>
+      <td>${jug.redoblona || '-'}</td>
+      <td>${jug.posRedoblona || '-'}</td>
+      <td>${jug.loterias.length}</td>
+      <td>$${jug.importe.toLocaleString('es-AR')}</td>
+      <td><button class='eliminar'>❌</button></td>
+    `;
+    tr.querySelector('.eliminar').onclick = () => {
+      window.jugadasTemp = window.jugadasTemp.filter(x => x !== jug);
+      tr.remove();
+      actualizarTotalEnVivo();
+    };
+    tbody.appendChild(tr);
+  });
+
+  alert(`✅ Ticket #${ticketId} repetido con importe $${nuevoMonto}`);
+  actualizarTotalEnVivo();
+
+  // 🔁 Guardar jugadas listas para enviar
+  if (window.jugadasTemp?.length > 0) {
+    localStorage.setItem('jugadasPendientes', JSON.stringify(window.jugadasTemp));
+  } else {
+    localStorage.removeItem('jugadasPendientes');
+  }
+}
+
+
 function mostrarJugadasEnviadas() {
   const contenido = document.getElementById('contenidoPrincipal');
   const fechaSeleccionada = document.getElementById('filtroFecha')?.value;
@@ -3725,6 +3934,19 @@ function mostrarResultados(aciertos) {
   }
 
   tabla.innerHTML = "";
+    // 🔽 ORDENAR POR HORARIO (extrae el número dentro del texto de la lotería)
+  //     luego por número de ticket, y finalmente por nombre de lotería.
+  aciertos.sort((a, b) => {
+    const horaA = a.loteria?.match(/\d+/) ? parseInt(a.loteria.match(/\d+/)[0]) : 0;
+    const horaB = b.loteria?.match(/\d+/) ? parseInt(b.loteria.match(/\d+/)[0]) : 0;
+    if (horaA !== horaB) return horaA - horaB;
+
+    const tickA = parseInt(a.numero_ticket || a.ticket_id || a.ticket || 0);
+    const tickB = parseInt(b.numero_ticket || b.ticket_id || b.ticket || 0);
+    if (tickA !== tickB) return tickA - tickB;
+
+    return a.loteria.localeCompare(b.loteria);
+  });
   aciertos.forEach((a, i) => {
     tabla.innerHTML += `
       <tr>
@@ -3813,13 +4035,32 @@ document.addEventListener('click', (e) => {
 
   console.log("🧹 Botón 'Vaciar' presionado");
   if (confirm("¿Vaciar todas las jugadas cargadas?")) {
-    jugadasTemp = [];
-    const lista = document.getElementById('listaJugadas');
+
+    // 1️⃣ Vaciar jugadas actuales en memoria
     window.jugadasTemp = [];
-actualizarTotalEnVivo(); // 💰 limpia visual después de enviar
+    if (typeof jugadasTemp !== "undefined") jugadasTemp = [];
+
+    // 2️⃣ Limpiar todas las referencias en localStorage
+    localStorage.removeItem('jugadasPendientes');
+    localStorage.removeItem('jugadasTemp');
+    localStorage.removeItem('jugadasEnviadas');
+
+    // 3️⃣ Limpiar visualmente la tabla
+    const lista = document.getElementById('listaJugadas');
     if (lista) lista.innerHTML = '';
+
+    // 4️⃣ Desmarcar todas las loterías seleccionadas
+    document.querySelectorAll('.casilla-sorteo.activo').forEach(celda => {
+      celda.classList.remove('activo');
+    });
+
+    // 5️⃣ Recalcular total ($0)
+    actualizarTotalEnVivo();
+
+    console.log("✅ Todo vaciado correctamente: jugadas, pendientes y loterías.");
   }
 });
+
 async function cambiarContrasena() {
   const actual = document.getElementById('claveActual').value.trim();
   const nueva1 = document.getElementById('claveNueva1').value.trim();
@@ -4287,4 +4528,33 @@ function desactivarDividirMonto() {
 
   // 3) Si salís de mobile, asegurá que se cierre
   window.addEventListener('resize', () => { if (!isMobile()) document.body.classList.remove('sidebar-open'); });
+})();
+
+// 🔁 Refresco automático del total si cambia jugadasTemp (modo main)
+(function () {
+  const _origPush = Array.prototype.push;
+  const _origSplice = Array.prototype.splice;
+  const _origPop = Array.prototype.pop;
+  const _origShift = Array.prototype.shift;
+
+  // Interceptar push (agregar)
+  Array.prototype.push = function(...args) {
+    const result = _origPush.apply(this, args);
+    if (this === window.jugadasTemp) {
+      try { actualizarTotalEnVivo(); } catch(e) { console.warn("⚠️ No se pudo actualizar total (push):", e); }
+    }
+    return result;
+  };
+
+  // Interceptar splice, pop y shift (eliminar/modificar)
+  ['splice','pop','shift'].forEach(method => {
+    const orig = Array.prototype[method];
+    Array.prototype[method] = function(...args) {
+      const result = orig.apply(this, args);
+      if (this === window.jugadasTemp) {
+        try { actualizarTotalEnVivo(); } catch(e) { console.warn(`⚠️ No se pudo actualizar total (${method}):`, e); }
+      }
+      return result;
+    };
+  });
 })();
