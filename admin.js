@@ -2894,7 +2894,7 @@ if (j.posicionR && !j.posRedoblona) j.posRedoblona = j.posicionR;
           if (esRedoblona) {
             // ——— REDOBLONA ———
             const pagos = {
-              "1-5": 1280, "1-10": 640, "1-20": 336.84,
+              "1-5": 1280, "1-10": 640,"1-15": 426.67,  "1-20": 336.84,
               "5-5": 256,  "5-10": 128, "5-20": 64,
               "10-10": 64, "10-20": 32, "20-20": 16
             };
@@ -2909,6 +2909,7 @@ if (j.posicionR && !j.posRedoblona) j.posRedoblona = j.posicionR;
             const zonaR =
               pos === 1 && posR === 5  ? posiciones.slice(1, 6)  :
               pos === 1 && posR === 10 ? posiciones.slice(1, 11) :
+              pos === 1 && posR === 15 ? posiciones.slice(1, 16) :
               pos === 1 && posR === 20 ? posiciones.slice(1, 20) :
               zonaPorPosicion(posR, posiciones);
         
@@ -2918,6 +2919,39 @@ if (j.posicionR && !j.posRedoblona) j.posRedoblona = j.posicionR;
               cantidad = coincidenciasR;                         // ← 1 fila por coincidencia
               aciertoUnitario = pagos[clavePago] * Number(j.importe);
             }
+            // ——— PREMIO POSICIÓN 15 ———
+} else if (pos === 15) {
+  const zona15 = posiciones.slice(0, 15);
+  const num = String(j.numero).padStart(4,'0');
+
+  // 4 CIFRAS
+  if (j.numero.length === 4) {
+    const coincidencias = zona15.filter(n => n === num).length;
+    if (coincidencias > 0) {
+      cantidad = coincidencias;
+      aciertoUnitario = 233.33 * Number(j.importe);
+    }
+  }
+
+  // 3 CIFRAS
+  else if (j.numero.length === 3) {
+    const fin3 = num.slice(-3);
+    const coincidencias = zona15.filter(n => n.endsWith(fin3)).length;
+    if (coincidencias > 0) {
+      cantidad = coincidencias;
+      aciertoUnitario = 40 * Number(j.importe);
+    }
+  }
+
+  // 2 CIFRAS
+  else if (j.numero.length === 2) {
+    const fin2 = num.slice(-2);
+    const coincidencias = zona15.filter(n => n.endsWith(fin2)).length;
+    if (coincidencias > 0) {
+      cantidad = coincidencias;
+      aciertoUnitario = 4.67 * Number(j.importe);
+    }
+  }
           } else if ([5,10,20].includes(pos)) {
             // ——— PREMIOS 5/10/20 ———
             const zona = zonaPorPosicion(pos, posiciones);
@@ -3080,6 +3114,7 @@ function calcularPremioRedoblona(jugada, numeros) {
   const pagos = {
     "1-5": 1280,
     "1-10": 640,
+    "1-15": 426.67,
     "1-20": 336.84,
     "5-5": 256,
     "5-10": 128,
@@ -3102,6 +3137,7 @@ function calcularPremioRedoblona(jugada, numeros) {
 const zonaRedoblona =
 pos === 1 && posR === 5  ? numeros.slice(1, 6)  : // posiciones 2..5
 pos === 1 && posR === 10 ? numeros.slice(1, 11) : // posiciones 2..10
+pos === 1 && posR === 15 ? numeros.slice(1, 16) :
 pos === 1 && posR === 20 ? numeros.slice(1, 20) : // posiciones 2..20
 [5, 10, 20].includes(pos) && [5, 10, 20].includes(posR)
   ? zonaPorPosicion(posR, numeros)                // ambos 1..R
@@ -3332,7 +3368,17 @@ const aciertos = (aciertosTodos || []).filter(a => !anuladosNums.has(Number(a.id
         console.log("📦 Arrastre anterior calculado:", arrastreAnterior);
       }
     }
+// ⭐️ REGLA DEL LUNES ⭐️
+const esLunes = new Date(fechaIso + "T00:00:00").getDay() === 1;
 
+if (esLunes && saldo === 0) {
+  if (arrastreAnterior > 0) {
+    console.log("📘 Lunes sin movimiento → arrastre positivo NO se copia.");
+    arrastreAnterior = 0;
+  } else {
+    console.log("📘 Lunes sin movimiento → arrastre negativo SÍ se copia.");
+  }
+}
     let saldoFinalConArrastre = saldo + arrastreAnterior;
 
     const esSabado = new Date(fechaIso + "T00:00:00").getDay() === 6;

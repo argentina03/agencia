@@ -650,6 +650,39 @@ function bloquearCeldas() {
       return;
     }
 
+        // 🔒 BLOQUEOS ESPECIALES SOLO SÁBADO
+    const sigla = celda.dataset.loteria; // ya existe en el HTML
+
+    if (diaSemana === 6) {
+
+      // ❌ SANTA CRUZ → bloqueada todo el día
+      if (sigla === "SCR") {
+        celda.classList.add('bloqueado');
+        celda.classList.remove('activo');
+        return;
+      }
+
+      // ❌ SALTA 18:00
+      if (sigla === "SAL" && hora === "18:00") {
+        celda.classList.add('bloqueado');
+        celda.classList.remove('activo');
+        return;
+      }
+
+      // ❌ MISIONES 18:00
+      if (sigla === "MIS" && hora === "18:00") {
+        celda.classList.add('bloqueado');
+        celda.classList.remove('activo');
+        return;
+      }
+
+      // ❌ MONTEVIDEO 15:00
+      if (sigla === "ORO" && hora === "15:00") {
+        celda.classList.add('bloqueado');
+        celda.classList.remove('activo');
+        return;
+      }
+    }
     const [hh, mm] = hora.split(':').map(Number);
     const minutosSorteo = hh * 60 + mm;
 
@@ -662,9 +695,14 @@ function bloquearCeldas() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   await obtenerUltimoTicket();
-  bloquearCeldas();
+
+  // ❌ BORRAR ESTO:
+  // bloquearCeldas();
+
+  // ✔️ SOLO ESTO:
   setInterval(bloquearCeldas, 30000);
-    actualizarTotalEnVivo();
+
+  actualizarTotalEnVivo();
 });
 async function guardarTicketEnSupabase(ticket) {
   const url = 'https://agithblutrkibaydjbsl.supabase.co/rest/v1/jugadas_enviadas';
@@ -1088,8 +1126,17 @@ function verificarPremio() {
 
     const id = columnas[0].textContent.trim();
     if (id === ticketNumero) {
-      const premioTexto = columnas[7].textContent.replace(/\D/g, '');
-      total += parseFloat(premioTexto || 0);
+      // tomar el texto como está en la tabla
+let premioTexto = columnas[7].textContent.trim();
+
+// manejar formato argentino: $12.345,67 → 12345,67
+premioTexto = premioTexto
+  .replace(/[^\d,.-]/g, '')  // saca $ y espacios
+  .replace(/\./g, '')        // saca separadores de miles
+  .replace(',', '.');        // convierte coma → punto para parseFloat
+
+const premio = parseFloat(premioTexto);
+total += isNaN(premio) ? 0 : premio;
     }
   });
 
@@ -1749,6 +1796,7 @@ btnHora.style.boxSizing = "border-box";
         if (loterias[key].includes(hora)) {
           celda.classList.add("casilla-sorteo");
           celda.dataset.lot = key;
+          celda.dataset.loteria = key;
           celda.dataset.horario = hora;
       
           const clave = key + hora.split(':')[0].padStart(2, '0'); // ej: "NAC10"
@@ -1802,7 +1850,7 @@ btnHora.style.boxSizing = "border-box";
 frag.appendChild(nuevoTbody);
 cuerpo.parentNode.replaceChild(frag.firstChild, cuerpo);
 // setTimeout(bloquearCeldas, 10);
-bloquearCeldas(); // 👈 volver a aplicar cierres por hora inmediatamente
+setTimeout(() => bloquearCeldas(), 50);
   }
 
   let ultimoImporte = ""; // 🧠 Guardamos el último importe ingresado
@@ -2873,7 +2921,19 @@ const hora  = ticket.hora
     <button onclick="mostrarSeccion('enviadas')" style="font-size:18px;padding:6px 12px;margin:5px">🔙 Volver</button>
   </div>
 
-  <div class="ticket-preview" style="font-family:monospace;background:white;padding:20px;color:black;text-align:center;width:300px;margin:0 auto;transform:scale(1.2);transform-origin:top center;font-weight:900">
+  <div class="ticket-preview" style="
+  font-family: monospace;
+  background: white;
+  color: black;
+  text-align: center;
+  width: 300px;
+  margin: 0 auto;
+  padding: 20px;
+  border: 2px solid #000;
+  font-weight: 900;
+  transform: scale(1.0001);   /* 👈 TRUCO para que html2canvas renderice perfecto */
+  transform-origin: top center;
+">
     <h3 style="margin:0">TICKET #${ticket.numero || '¿?'}</h3>
     <p style="margin:4px 0">Fecha: ${fecha} &nbsp;&nbsp; Hora: ${hora} &nbsp;&nbsp; Pasador: ${ticket.vendedor}</p>
 `;
@@ -2894,13 +2954,17 @@ let total = 0;
 
 Object.entries(grupos).forEach(([loterias, jugadas]) => {
   const ordenadas = ordenarLoterias(loterias.split(','));
-  const lotFila1 = ordenadas.slice(0, 7).join(' ');
-  const lotFila2 = ordenadas.slice(7).join(' ');
+  const lotFila1 = ordenadas.slice(0, 5).join(' ');
+  const lotFila2 = ordenadas.slice(5).join(' ');
   
-      html += `<hr style="border:1px solid black;margin:4px 0">
-        <div style="text-align:center;font-size:13px">${lotFila1}</div>`;
-      if (lotFila2) html += `<div style="text-align:center;font-size:13px">${lotFila2}</div>`;
       html += `<hr style="border:1px solid black;margin:4px 0">`;
+
+for (let i = 0; i < ordenadas.length; i += 5) {
+  const fila = ordenadas.slice(i, i + 5).join(' ');
+  html += `<div style="text-align:left;font-size:13px;margin-left:10px">${fila}</div>`;
+}
+
+html += `<hr style="border:1px solid black;margin:4px 0">`;
   
       jugadas.forEach(j => {
         const numeroStr = '*'.repeat(4 - j.numero.length) + j.numero;
@@ -3509,7 +3573,19 @@ async function verTicketPremiado() {
       <button onclick="guardarTicketGanadorComoImagen()" style="font-size:18px;padding:8px 20px;margin:6px">📷 Guardar Imagen</button>
     </div>
 
-    <div class="ticket-preview" style="font-family:monospace;background:white;padding:20px;color:black;text-align:center;width:300px;margin:0 auto;transform:scale(1.2);transform-origin:top center;font-weight:900">
+   <div class="ticket-preview" style="
+  font-family: monospace;
+  background: white;
+  color: black;
+  text-align: center;
+  width: 300px;
+  margin: 0 auto;
+  padding: 20px;
+  font-weight: 900;
+  border: 2px solid #000;
+  transform: scale(1.0001);
+  transform-origin: top center;
+">
       <div style="display:flex;justify-content:space-between;font-size:21px;font-weight:bold;margin-bottom:6px">
         <div>TICKET #${ticketNumero}</div>
         <div>PREMIADO</div>
@@ -3673,7 +3749,25 @@ const num = numOriginal.padStart(4, '0'); // lo usás para redoblonas o AMBO si 
       total += { 5: 14, 10: 7, 20: 3.5 }[posicion] * importe;
     }
   }
+// ⭐ NUEVO: posición 15 normal (2C / 3C / 4C)
+if (posicion === 15 && !(redoblona && posRedoblona)) {
+  const zona15 = numeros.slice(0, 15); // posiciones 1 a 15
 
+  // 4 cifras exactas
+  if (numOriginal.length === 4 && zona15.includes(num)) {
+    total += 233.33 * importe;
+  }
+
+  // 3 cifras
+  else if (numOriginal.length === 3 && zona15.some(n => n.endsWith(num.slice(-3)))) {
+    total += 40 * importe;
+  }
+
+  // 2 cifras
+  else if (numOriginal.length === 2 && zona15.some(n => n.endsWith(num.slice(-2)))) {
+    total += 4.67 * importe;
+  }
+}
   if (redoblona && posRedoblona) {
     const premioRedoblona = calcularPremioRedoblona(jugada, numeros);
     total += premioRedoblona;
@@ -3696,6 +3790,7 @@ function calcularPremioRedoblona(jugada, numeros, claveLoteria = '') {
   const pagos = {
     "1-5": 1280,
     "1-10": 640,
+    "1-15": 426.67,
     "1-20": 336.84,
     "5-5": 256,
     "5-10": 128,
@@ -3717,6 +3812,7 @@ function calcularPremioRedoblona(jugada, numeros, claveLoteria = '') {
   const zonaRedoblona =
   pos === 1 && posR === 5 ? numeros.slice(1, 6) :
   pos === 1 && posR === 10 ? numeros.slice(1, 11) :
+  pos === 1 && posR === 15 ? numeros.slice(1, 16) :
     pos === 1 && posR === 20 ? zona20 :
     [5, 10, 20].includes(pos) && [5, 10, 20].includes(posR)
   ? zonaPorPosicion(posR, numeros)
