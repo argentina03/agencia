@@ -3283,10 +3283,14 @@ function descargarTicketComoImagen() {
   const ticket = document.querySelector('.ticket-preview');
   if (!ticket) return alert("No se encontró el ticket para guardar");
 
-  html2canvas(ticket).then(canvas => {
+  html2canvas(ticket, {
+    backgroundColor: '#ffffff',
+    scale: 3,
+    useCORS: true
+  }).then(canvas => {
     const enlace = document.createElement('a');
-    enlace.href = canvas.toDataURL('image/jpeg');
-    enlace.download = `ticket_${Date.now()}.jpeg`;
+    enlace.href = canvas.toDataURL('image/png');  
+    enlace.download = `ticket_${Date.now()}.png`;
     enlace.click();
   });
 }
@@ -3295,10 +3299,14 @@ function guardarLiquidacionComoImagen() {
   const ticket = document.querySelector('.liquidacion-ticket');
   if (!ticket) return alert("No se encontró la liquidación para guardar");
 
-  html2canvas(ticket).then(canvas => {
+  html2canvas(ticket, {
+    backgroundColor: '#ffffff',
+    scale: 3,
+    useCORS: true
+  }).then(canvas => {
     const enlace = document.createElement('a');
-    enlace.href = canvas.toDataURL('image/jpeg');
-    enlace.download = `liquidacion_${Date.now()}.jpeg`;
+    enlace.href = canvas.toDataURL('image/png');  
+    enlace.download = `liquidacion_${Date.now()}.png`;
     enlace.click();
   });
 }
