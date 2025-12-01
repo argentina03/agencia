@@ -3646,12 +3646,16 @@ function guardarTicketGanadorComoImagen() {
   const ticket = document.querySelector('.ticket-preview');
   if (!ticket) return alert("No se encontró el ticket para guardar");
 
-  html2canvas(ticket).then(canvas => {
+  html2canvas(ticket, {
+  backgroundColor: '#ffffff',
+  scale: 3,
+  useCORS: true
+}).then(canvas => {
     const enlace = document.createElement('a');
-    enlace.href = canvas.toDataURL('image/jpeg');
-    enlace.download = `ticket_ganador_${Date.now()}.jpeg`;
+    enlace.href = canvas.toDataURL('image/png');  // 🔥 ULTRA HD en PC
+    enlace.download = `ticket_ganador_${Date.now()}.png`;
     enlace.click();
-  });
+});
 }
 async function buscarResultados() {
   const fecha = document.getElementById('buscarFecha').value;
