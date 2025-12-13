@@ -4,8 +4,18 @@ const SUPABASE_KEY = window.__CONFIG__.SUPABASE_KEY;
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // === Helpers de fecha y bloqueos (comparten admin y pasadores) ===
 function hoyISO() {
-  // mismo criterio horario que usás para "hoy"
-  return new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // Fecha "local" real de Buenos Aires, sin UTC y sin corrimientos nocturnos
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+
+  const y = parts.find(p => p.type === 'year')?.value;
+  const m = parts.find(p => p.type === 'month')?.value;
+  const d = parts.find(p => p.type === 'day')?.value;
+  return `${y}-${m}-${d}`;
 }
 
 // Traer bloqueos desde la nube para una fecha (Set de siglas)
@@ -508,7 +518,7 @@ function _ahoraBuenosAiresEnMin() {
 
 async function mostrarResultados() {
   const zona = document.getElementById("zonaContenido");
-  const hoy = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const hoy = hoyISO();
 
   // Config desde localStorage
   const lotCfg = JSON.parse(localStorage.getItem('loteriasConfig') || '[]');  // [{nombre, sigla, horarios}]
@@ -700,11 +710,11 @@ const mkInput = (n)=>`
            style="width:70px;padding:6px;text-align:center;border:1px solid #444;border-radius:6px">
   </div>`;
 // defaults de filtros
-const hoyISO = new Date(Date.now() - 3*60*60*1000).toISOString().slice(0,10);
+const hoyFiltros = hoyISO();
 const inpD = document.getElementById('f_desde');
 const inpH = document.getElementById('f_hasta');
-if (inpD && !inpD.value) inpD.value = hoyISO;
-if (inpH && !inpH.value) inpH.value = hoyISO;
+if (inpD && !inpD.value) inpD.value = hoyFiltros;
+if (inpH && !inpH.value) inpH.value = hoyFiltros;
 
 // botón Filtrar
 const btnF = document.getElementById('btnFiltrarAciertos');
@@ -810,8 +820,17 @@ $$('.campo-numero-ganador').forEach(inp=>{
     $('#resMsg').textContent='Guardando…';
     try {
       await subirResultadoManual();
-      $('#resMsg').textContent='✅ Guardado';
-      await cargarTablero();
+$('#resMsg').textContent='✅ Guardado';
+
+// 👇 refrescar tablero del mismo día que cargaste (si estabas cargando “ayer”)
+const tabF = document.getElementById('tabFecha');
+if (tabF) tabF.value = fecha;
+await cargarTablero();
+
+// 👇 refrescar la tabla de aciertos (así se borra visualmente el viejo y queda el nuevo)
+if (typeof cargarAciertosConFiltros === 'function') {
+  await cargarAciertosConFiltros();
+}
     } catch (e) {
       console.error(e);
       $('#resMsg').textContent='❌ Error al guardar';
@@ -989,9 +1008,10 @@ tbody.querySelectorAll('.btnEliminar').forEach(btn => {
   
     document.getElementById('tabMsg').textContent='Cargando…';
     const { data, error } = await supabase
-      .from('resultados')
-      .select('loteria,horario,posiciones')
-      .eq('fecha', fecha);
+  .from('resultados')
+  .select('id,loteria,horario,posiciones')
+  .eq('fecha', fecha)
+  .order('id', { ascending: true });
   
     if (error) {
       console.error(error);
