@@ -10,7 +10,7 @@ function mostrarError(msg, error = null) {
 const SUPABASE_URL = window.__CONFIG__.SUPABASE_URL;
 const SUPABASE_KEY = window.__CONFIG__.SUPABASE_KEY;
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // === Bloqueos locales de hoy (los setea el Admin en Editar Sistema) ===
 function hoyISO() { 
   return new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0,10); 

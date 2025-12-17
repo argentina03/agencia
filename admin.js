@@ -1,7 +1,7 @@
 const SUPABASE_URL = window.__CONFIG__.SUPABASE_URL;
 const SUPABASE_KEY = window.__CONFIG__.SUPABASE_KEY;
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // === Helpers de fecha y bloqueos (comparten admin y pasadores) ===
 function hoyISO() {
   // Fecha "local" real de Buenos Aires, sin UTC y sin corrimientos nocturnos
