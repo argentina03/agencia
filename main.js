@@ -704,6 +704,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   actualizarTotalEnVivo();
 });
+// 🚫 Evitar scroll al usar AvPág / Fn+↓ para enviar ticket
+document.addEventListener('keydown', (e) => {
+  const esAvPag =
+    e.key === 'PageDown' ||
+    e.code === 'PageDown' ||
+    (e.key === 'ArrowDown' && e.metaKey); // Mac: Fn + ↓
+
+  // Solo si estamos en la pantalla de carga de jugadas
+  if (esAvPag && document.getElementById('btnEnviar')) {
+    e.preventDefault();   // ⛔ NO scrollea
+    e.stopPropagation();
+    enviarTicket();       // ✅ envía directo
+  }
+}, { passive: false });
 async function guardarTicketEnSupabase(ticket) {
   const url = 'https://agithblutrkibaydjbsl.supabase.co/rest/v1/jugadas_enviadas';
   const apiKey = SUPABASE_KEY;
@@ -1012,6 +1026,14 @@ const grupos = {};
 </div>`;
   document.getElementById('contenidoPrincipal').innerHTML = html;
 
+// ✅ NO bajar al total: limpiar foco y volver arriba (después del render)
+requestAnimationFrame(() => {
+  try { document.activeElement?.blur?.(); } catch (_) {}
+  try { document.getElementById('contenidoPrincipal').scrollTop = 0; } catch (_) {}
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+});
+  
+
   const ticket = {
     numero: numeroTicket,  // ✅ agregado
     fecha: fechaStr,
@@ -1183,22 +1205,151 @@ function mostrarResultados(resultados) {
 const CLAVE_SOLAPA_LIQ = "120212";
 
 // Devuelve true si la clave es correcta
-function pedirClaveLiquidaciones() {
-  const ingreso = prompt("🔒 Ingresá la contraseña para LIQUIDACIONES:");
-  return ingreso === CLAVE_SOLAPA_LIQ;
+// 🔐 Modal bonito para LIQUIDACIONES
+function pedirClaveLiquidacionesModal(onOk) {
+  if (document.getElementById('modalClaveLiq')) return;
+
+  const modal = document.createElement('div');
+  modal.id = 'modalClaveLiq';
+  modal.style = `
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.75);
+    display:flex; align-items:center; justify-content:center;
+    z-index:99999;
+  `;
+
+  modal.innerHTML = `
+    <div id="boxClaveLiq" style="
+      background:#111;
+      border:2px solid #444;
+      padding:24px;
+      width:300px;
+      text-align:center;
+      font-family:monospace;
+      color:white;
+      border-radius:10px;
+    ">
+      <h3 style="margin-bottom:14px">🔒 LIQUIDACIONES</h3>
+
+      <input
+  id="inputClaveLiq"
+  type="text"
+  inputmode="numeric"
+  autocomplete="off"
+  name="nope_liq_${Date.now()}"
+  autocorrect="off"
+  autocapitalize="off"
+  spellcheck="false"
+  placeholder="Ingresá la clave"
+  style="
+    width:100%;
+    padding:10px;
+    font-size:16px;
+    text-align:center;
+    margin-bottom:14px;
+  "
+>
+
+      <div style="display:flex;gap:8px">
+        <button id="btnClaveLiq" style="
+          flex:8;
+          padding:10px;
+          font-size:16px;
+          font-weight:bold;
+          background:#2ecc71;
+          border:none;
+          cursor:pointer;
+        ">ENTRAR</button>
+
+        <button id="btnSalirLiq" style="
+          flex:2;
+          padding:10px;
+          font-size:16px;
+          font-weight:bold;
+          background:#444;
+          color:#ccc;
+          border:none;
+          cursor:pointer;
+        ">✕</button>
+      </div>
+
+      <div id="errorClaveLiq" style="
+        color:#ff5555;
+        margin-top:10px;
+        display:none
+      ">
+        ❌ Clave incorrecta
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const input = document.getElementById('inputClaveLiq');
+  // 🔐 ocultar escritura como password (••••) SIN autofill
+let primerInput = true;
+
+input.addEventListener('input', () => {
+  if (primerInput) {
+    input.type = 'password'; // recién acá lo volvemos password
+    primerInput = false;
+  }
+});
+  const btn = document.getElementById('btnClaveLiq');
+  const btnSalir = document.getElementById('btnSalirLiq');
+  const error = document.getElementById('errorClaveLiq');
+  const box = document.getElementById('boxClaveLiq');
+
+  // 🔥 foco automático y vacío
+  setTimeout(() => {
+  input.type = 'text';   // vuelve a texto
+  input.value = '';     // vacío SIEMPRE
+  input.focus();
+  primerInput = true;   // resetea estado
+}, 50);
+
+  function cerrar() {
+    modal.remove();
+  }
+
+  function validar() {
+    if (input.value === CLAVE_SOLAPA_LIQ) {
+      window.__LIQ_OK = true;
+      cerrar();
+      input.setAttribute('readonly', 'readonly');
+      onOk();
+    } else {
+      error.style.display = 'block';
+      input.select();
+    }
+  }
+
+  btn.onclick = validar;
+  btnSalir.onclick = cerrar;
+
+  // ⏎ ENTER normal + numpad
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === 'NumpadEnter') {
+      e.preventDefault();
+      validar();
+    }
+  });
+
+  // 🖱️ click afuera → salir
+  modal.addEventListener('click', (e) => {
+    if (!box.contains(e.target)) cerrar();
+  });
 }
 function mostrarSeccion(seccion) {
   // 🔐 Gate simple para la solapa LIQUIDACIONES
   if (seccion === 'liquidaciones') {
-    if (!window.__LIQ_OK) {                 // no vuelve a pedir hasta recargar
-      const ok = pedirClaveLiquidaciones(); // prompt("...") === "120212"
-      if (!ok) {
-        alert("❌ Contraseña incorrecta.");
-        return;                              // no entra a liquidaciones
-      }
-      window.__LIQ_OK = true;
-    }
+  if (!window.__LIQ_OK) {
+    pedirClaveLiquidacionesModal(() => {
+      mostrarSeccion('liquidaciones');
+    });
+    return;
   }
+}
 
   const contenido = document.getElementById('contenidoPrincipal');
   switch (seccion) {
@@ -3420,6 +3571,12 @@ const { data: aciertosData, error: aciertosError } = await supabase
 let aciertosHTML = "";
 
 if (!aciertosError && Array.isArray(aciertosData) && aciertosData.length > 0) {
+  // ✅ ORDEN VISUAL DE LIQUIDACIÓN POR HORA DE SORTEO (10 → 12 → 15 → 18 → 21)
+aciertosData.sort((a, b) => {
+  const horaA = parseInt(String(a.loteria || '').replace(/\D/g, '')) || 99;
+  const horaB = parseInt(String(b.loteria || '').replace(/\D/g, '')) || 99;
+  return horaA - horaB;
+});
   aciertosData.forEach(a => {
     const lot = a.loteria || "-";
     const num = a.numero || "-";

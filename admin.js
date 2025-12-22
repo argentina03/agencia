@@ -589,7 +589,7 @@ if (window.ES_ADMIN_HIJO) {
   </div>
 
   <!-- Modal -->
-  <div id="resModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);place-items:center;z-index:9999">
+  <div id="resModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);place-items:start center;padding-top:60px;z-index:9999">
   <div style="background:#0b0b0b;border:1px solid #444;border-radius:10px;padding:14px;width:auto;min-width:auto;max-width:90vw">
       <div id="mTitulo" style="color:#fff;font-weight:700;margin-bottom:8px"></div>
       <div id="mLista" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px"></div>
@@ -2458,6 +2458,36 @@ function renderTicketPreviewAdmin(ticket) {
 // ====== Enviar ticket a la nube (admin) + Overlay ======
 // ====== Enviar ticket a la nube (admin) + Overlay ======
 async function enviarTicketAdmin(){
+    // =========================
+  // 🔒 Anti-duplicados (LOCK)
+  // =========================
+  if (window.__ENVIANDO_TICKET_ADMIN) return; // si ya está enviando, ignorar clicks extra
+  window.__ENVIANDO_TICKET_ADMIN = true;
+
+  const __btnEnviar = document.getElementById('btnEnviarAdmin');
+  const __txtOriginal = __btnEnviar ? __btnEnviar.textContent : '';
+  if (__btnEnviar) {
+    __btnEnviar.disabled = true;
+    __btnEnviar.textContent = 'Enviando...';
+  }
+
+  // “anti doble envío” por mismo contenido (15s)
+  const __now = Date.now();
+  const __simpleHash = (s) => {
+    let h = 0; for (let i=0;i<s.length;i++) h = ((h<<5)-h) + s.charCodeAt(i) | 0;
+    return String(h);
+  };
+  const __rememberPayload = (payloadObj) => {
+    try {
+      const raw = JSON.stringify(payloadObj);
+      const hash = __simpleHash(raw);
+      const last = window.__LAST_SEND_ADMIN;
+      if (last && last.hash === hash && (__now - last.ts) < 15000) return false; // ya lo mandaste hace nada
+      window.__LAST_SEND_ADMIN = { hash, ts: __now };
+      return true;
+    } catch { return true; }
+  };
+    try {
   // Modo "Monto total" (ADMIN)
   const usarMontoTotal = (window.__MTicketAdm?.activo === true);
   const montoTotalDeseado = Number(window.__MTicketAdm?.total || 0);
@@ -2522,6 +2552,10 @@ posRedoblona: j.posRedoblona ? Number(j.posRedoblona) : null,
 importe: Number(j.importe),
 loterias: [...(j.loterias || [])]
 }));
+// ✅ evita re-enviar EXACTAMENTE el mismo ticket si se disparó dos veces por lag/atajos (15s)
+if (!__rememberPayload({ fecha, pasador, usarMontoTotal, montoTotalDeseado, jugadasPayload })) {
+  return;
+}
 
 // Loterías únicas para mostrar en el ticket
 const loteriasUnicas = [...new Set(jugadasPayload.flatMap(j => j.loterias || []))];
@@ -2602,7 +2636,15 @@ if (ticket.id) {
   } catch (e) {
     console.warn('⚠️ Error limpiando la interfaz después de enviar el ticket:', e);
   }
+    } finally {
+    window.__ENVIANDO_TICKET_ADMIN = false;
+    if (__btnEnviar) {
+      __btnEnviar.disabled = false;
+      __btnEnviar.textContent = __txtOriginal || 'Enviar';
+    }
+  }
 }
+
 
 // ====== HTML del ticket (Admin) para overlay ======
 function renderTicketHTMLAdmin(ticket) {
@@ -4118,13 +4160,28 @@ async function renderLiquidacionRealAdmin({ fecha, vendedor, targetEl }) {
           📥 Descargar imagen
         </button>
       </div>
-      <div id="liqTicketBody" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    background:#fff;color:#000;border:2px solid #000;border-radius:14px;padding:22px;max-width:540px;margin:0 auto;font-weight:900"></div>
+     <div id="liqScale" style="width:100%;display:flex;justify-content:center;align-items:flex-start;">
+  <div id="liqTicketBody" style="
+    font-family:monospace;
+    background:#fff;
+    color:#000;
+    padding:clamp(12px,3.5vw,20px);
+    width:500px;
+    max-width:100%;
+    box-sizing:border-box;
+    border:2px solid black;
+    font-weight:900;
+    overflow:hidden;
+    font-size:clamp(12px, 1.15vw, 18px);
+    transform-origin: top center;
+  "></div>
+</div>
     </div>
   `;
 
-  const body = targetEl.querySelector('#liqTicketBody');
-  const loading = targetEl.querySelector('#liqLoading');
+  const scaleWrap = targetEl.querySelector('#liqScale');
+const body = targetEl.querySelector('#liqTicketBody');
+const loading = targetEl.querySelector('#liqLoading');
 
   try {
     const { data: liq } = await supabase
@@ -4177,36 +4234,86 @@ async function renderLiquidacionRealAdmin({ fecha, vendedor, targetEl }) {
 
     const { data: aciertos } = await supabase
   .from('aciertos')
-  .select('loteria, numero, posicion, importe, acierto, id')
+  .select('loteria, numero, posicion, redoblona, pos_redoblona, importe, acierto, id')
   .eq('fecha', fecha)
   .eq('vendedor', vendedor)
   .order('id', { ascending: true });
 
-    const aciertosHtml = (aciertos && aciertos.length)
-      ? `
-        <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:16px">
-          <thead>
-            <tr>
-              <th style="text-align:left;padding:4px 0;border-bottom:1px solid #000">LOT</th>
-              <th style="text-align:left;padding:4px 0;border-bottom:1px solid #000">NUM</th>
-              <th style="text-align:left;padding:4px 0;border-bottom:1px solid #000">UBI</th>
-              <th style="text-align:right;padding:4px 0;border-bottom:1px solid #000">APO</th>
-              <th style="text-align:right;padding:4px 0;border-bottom:1px solid #000">GANÓ</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${aciertos.map(a=>`
-              <tr>
-                <td style="padding:3px 0">${a.loteria||''}</td>
-                <td style="padding:3px 0">${a.numero||''}</td>
-                <td style="padding:3px 0">${a.posicion??''}</td>
-                <td style="padding:3px 0;text-align:right">$${fmt1(a.importe)}</td>
-                <td style="padding:3px 0;text-align:right;font-weight:700">$${fmt1(a.acierto)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>`
-      : `<div style="text-align:center;color:#9aa;letter-spacing:2px;margin:8px 0">SIN ACIERTOS PARA MOSTRAR</div>`;
+    let aciertosHTML = "";
+
+if (aciertos && aciertos.length) {
+  aciertos.forEach(a => {
+    const lot = a.loteria || "";
+    const num = a.numero || "";
+    const pos = (a.posicion ?? "-");
+    const apo = `$${fmt1(a.importe || 0)}`;
+    const gano = `$${fmt1(a.acierto || 0)}`;
+
+    const red = (a.redoblona ?? "-");
+    const posRed = (a.pos_redoblona ?? "-");
+
+    const tieneRed =
+      red !== "-" && red !== "" && red !== null &&
+      posRed !== "-" && posRed !== "" && posRed !== null;
+
+    if (tieneRed) {
+      aciertosHTML += `
+        <tr>
+          <td style="padding:3px 0">${lot}</td>
+          <td style="padding:3px 0">**${num}</td>
+          <td style="padding:3px 0">${pos}</td>
+          <td style="padding:3px 0;text-align:right">${apo}</td>
+          <td style="padding:3px 0;text-align:right;font-weight:700">-------</td>
+        </tr>
+        <tr>
+          <td style="padding:3px 0">${lot}</td>
+          <td style="padding:3px 0">:${red}</td>
+          <td style="padding:3px 0">${posRed}</td>
+          <td style="padding:3px 0;text-align:right">----</td>
+          <td style="padding:3px 0;text-align:right;font-weight:700">${gano}</td>
+        </tr>
+      `;
+    } else {
+      aciertosHTML += `
+        <tr>
+          <td style="padding:3px 0">${lot}</td>
+          <td style="padding:3px 0">${num}</td>
+          <td style="padding:3px 0">${pos}</td>
+          <td style="padding:3px 0;text-align:right">${apo}</td>
+          <td style="padding:3px 0;text-align:right;font-weight:700">${gano}</td>
+        </tr>
+      `;
+    }
+  });
+} else {
+  aciertosHTML = `<tr><td colspan="5" style="padding:8px;text-align:center;color:#888">SIN ACIERTOS PARA MOSTRAR</td></tr>`;
+}
+
+const aciertosHtml = `
+  <div style="max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch">
+  <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:16px;table-layout:fixed">
+  <colgroup>
+  <col style="width:20%">
+  <col style="width:20%">
+  <col style="width:12%">
+  <col style="width:24%">
+  <col style="width:24%">
+</colgroup>
+    <thead>
+      <tr>
+        <th style="text-align:left;padding:4px 0;border-bottom:1px solid #000">LOT</th>
+        <th style="text-align:left;padding:4px 0;border-bottom:1px solid #000">NUM</th>
+        <th style="text-align:left;padding:4px 0;border-bottom:1px solid #000">UBI</th>
+        <th style="text-align:right;padding:4px 0;border-bottom:1px solid #000">APO</th>
+        <th style="text-align:right;padding:4px 0;border-bottom:1px solid #000">GANÓ</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${aciertosHTML}
+    </tbody>
+  </table>
+  </div>
+`;
 
     body.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
@@ -4260,6 +4367,32 @@ async function renderLiquidacionRealAdmin({ fecha, vendedor, targetEl }) {
         <strong>${money(arrastreFin)}</strong>
       </div>
     `;
+
+    // ✅ Auto-fit: si entra, NO scroll; si no entra, se achica solo
+    const fitTicket = () => {
+      if (!scaleWrap || !body) return;
+
+      // reset
+      body.style.transform = 'scale(1)';
+
+      const availW = (scaleWrap.clientWidth || 0) - 8;
+      const naturalW = body.scrollWidth || 0;
+      if (availW <= 0 || naturalW <= 0) return;
+
+      const s = Math.min(1, availW / naturalW);
+      body.style.transform = `scale(${s})`;
+    };
+
+    // evitar múltiples listeners por cada render
+    if (targetEl._liqFitHandler) {
+      window.removeEventListener('resize', targetEl._liqFitHandler);
+    }
+    targetEl._liqFitHandler = () => fitTicket();
+    window.addEventListener('resize', targetEl._liqFitHandler, { passive: true });
+
+    // primera ejecución
+    fitTicket();
+
 
     document.getElementById('btnDescargarLiq').onclick = () => {
       html2canvas(body, { backgroundColor: '#fff', scale: 2 }).then(canvas => {
@@ -5228,9 +5361,19 @@ async function mostrarJugadasEnviadasAdmin() {
     const motivo = prompt('Motivo de anulación (opcional):', 'Anulado por admin') || 'Anulado por admin';
     await anularTicketsAdmin(ids, { motivo });
   };
-  document.getElementById('jv_chk_all').onchange = (e) => {
+    document.getElementById('jv_chk_all').onchange = (e) => {
     document.querySelectorAll('.jv_row_chk').forEach(ch => ch.checked = e.target.checked);
   };
+
+  // ✅ Auto-cargar al entrar (sin tocar nada del botón Buscar)
+  setTimeout(() => {
+    if (typeof buscarJugadasEnviadas === 'function') {
+      buscarJugadasEnviadas();
+    } else {
+      // fallback: simula click
+      document.getElementById('jv_buscar')?.click();
+    }
+  }, 0);
 }
 
 /***** ===================== 📈 CONTROL GENERAL — ADMIN (v2 · Top por Ticket) ===================== *****/
@@ -5797,8 +5940,9 @@ async function buscarJugadasEnviadas() {
   .select('id, numero, fecha, hora, vendedor, total, anulado, anulado_por, anulado_origen, anulado_motivo, anulado_at, jugadas, loterias')
   .gte('fecha', desde)
   .lte('fecha', hasta)
-  .order('fecha', { ascending: false })
-  .order('numero', { ascending: false });
+    .order('fecha', { ascending: false })
+  .order('hora',  { ascending: false })
+  .order('id',    { ascending: false });
 
   if (vend === '__ADMIN__') {
     q = q.gte('numero', 10000); // solo tickets de admin
@@ -6245,9 +6389,13 @@ async function verTicketAdminComoVendedor(id, detTr){
 
     // === mismas funciones que usa el vendedor ===
     const ordenarLoterias = (lista) => {
-      const orden = ['NAC','PRO','SFE','COR','RIO','CTE','MZA','CHA','JUJ','SAN','MIS','ORO','TUC'];
-      return lista.sort((a,b) => orden.indexOf(a.slice(0,3)) - orden.indexOf(b.slice(0,3)));
-    };
+  const orden  = ['NAC','PRO','SFE','COR','RIO','CTE','MZA','CHA','JUJ','SAN','NQN','CHB','RIN','LRJ','SAL','MIS','SCR','TUC','SGO','ORO'];
+  return lista.sort((a,b) => {
+    const ia = orden.indexOf(a.slice(0,3));
+    const ib = orden.indexOf(b.slice(0,3));
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib); // los desconocidos al final
+  });
+};
 
     const grupos = {};
     (jugadas||[]).forEach(j => {
@@ -6272,7 +6420,10 @@ const horaStr  = ticket.hora
     let html = `
       <div style="text-align:center;margin-bottom:20px">
         <button onclick="window.print()" style="font-size:18px;padding:8px 20px;margin:6px">🖨 Imprimir</button>
-        <button onclick="(function(n){const el=document.querySelector('#jv_det_${id} .ticket-preview');if(!el){alert('No hay ticket');return;} html2canvas(el,{backgroundColor:'#fff',scale:2}).then(c=>{const a=document.createElement('a');a.download='ticket_'+n+'.png';a.href=c.toDataURL('image/png');a.click();});})(${JSON.stringify(numeroTicket)})" style="font-size:18px;padding:8px 20px;margin:6px">📷 Guardar Imagen</button>
+        <button onclick="guardarTicketRiesgoComoImagen(${JSON.stringify(numeroTicket)})"
+style="font-size:18px;padding:8px 20px;margin:6px">
+📷 Guardar Imagen
+</button>
         <button onclick="(function(){const tr=document.getElementById('jv_det_${id}').parentElement;tr.style.display='none';document.getElementById('jv_det_${id}').innerHTML='';})()" style="font-size:18px;padding:8px 20px;margin:6px">🔙 Cerrar</button>
       </div>
     `;
@@ -6563,3 +6714,35 @@ Array.prototype.push = function(...args) {
   if (this === window.jugadasTempAdmin) actualizarTotalEnVivoAdmin();
   return result;
 };
+async function guardarTicketRiesgoComoImagen(numeroTicket) {
+  const ticketEl = document.querySelector('.ticket-preview');
+  if (!ticketEl) return alert('No hay ticket');
+
+  if (typeof html2canvas === 'undefined')
+    return alert('html2canvas no está cargado');
+
+  // 🔁 CLON EXACTO (lo que ves es lo que se guarda)
+  const clone = ticketEl.cloneNode(true);
+  clone.style.transform = 'none';
+  clone.style.margin = '0';
+  clone.style.position = 'fixed';
+  clone.style.left = '-10000px';
+  clone.style.top = '0';
+  clone.style.background = '#fff';
+
+  document.body.appendChild(clone);
+
+  const canvas = await html2canvas(clone, {
+    backgroundColor: '#ffffff',
+    scale: Math.max(3, window.devicePixelRatio || 1),
+    useCORS: true,
+    logging: false
+  });
+
+  clone.remove();
+
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/jpeg', 0.95);
+  a.download = `ticket_riesgo_${numeroTicket}.jpg`;
+  a.click();
+}
