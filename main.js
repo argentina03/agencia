@@ -426,7 +426,17 @@ const verificarYFiltrar = setInterval(() => {
     }
   }
 }
+function actualizarResumenEnviadas(lista) {
+  const activos = (lista || []).filter(t => !t.anulado);
+  const total = activos.reduce((acc, t) => acc + (Number(t.total) || 0), 0);
+  const cant = activos.length;
 
+  const elTotal = document.querySelector('.total-enviadas');
+  if (elTotal) elTotal.innerText = `$${total.toLocaleString('es-AR')}`;
+
+  const elTickets = document.querySelector('.tickets-enviadas');
+  if (elTickets) elTickets.innerText = String(cant);
+}
 // 🧩 Muestra solo las jugadas del día actual (visual, no filtra memoria)
 function filtrarSoloHoy() {
   const tbody = document.getElementById('tablaEnviadas');
@@ -437,6 +447,7 @@ function filtrarSoloHoy() {
 
   // 🧠 Si ya hay jugadas en pantalla, no limpiar aunque se dispare otra vez
   if (jugadasHoy.length === 0) {
+    document.querySelector('.tickets-enviadas').innerText = `0`;
     const yaHayFilas = tbody.querySelectorAll('tr').length > 1;
     if (yaHayFilas) {
       console.log("⏸️ Ya hay jugadas visibles, no limpiar tabla.");
@@ -450,17 +461,22 @@ function filtrarSoloHoy() {
         </td>
       </tr>`;
     document.querySelector('.total-enviadas').innerText = `$0`;
-    return;
+const tk = document.querySelector('.tickets-enviadas');
+if (tk) tk.innerText = '0';
+return;
   }
 
   // ✅ Si sí hay jugadas, renderizar normalmente
   renderizarFiltradas(jugadasHoy);
+  actualizarResumenEnviadas(jugadasHoy);
 
   const totalHoy = jugadasHoy
     .filter(t => !t.anulado)
     .reduce((acc, t) => acc + (t.total || 0), 0);
 
   document.querySelector('.total-enviadas').innerText = `$${totalHoy.toLocaleString('es-AR')}`;
+  const cantHoy = jugadasHoy.filter(t => !t.anulado).length;
+document.querySelector('.tickets-enviadas').innerText = String(cantHoy);
 }
 
 async function login() {
@@ -2675,14 +2691,28 @@ function mostrarJugadasEnviadas() {
         <label style="color:#aaa">Buscar por Ticket:</label><br>
         <input type="number" id="filtroTicket" placeholder="Ej: 1003" style="padding:6px;font-size:14px;background:#222;color:#0f0;border:1px solid #444">
       </div>
-      <div style="align-self:end">
-        <button onclick="filtrarEnviadas()" style="padding:8px 16px;background:#0a0;color:white;border:none;font-size:14px">🔍 Buscar</button>
-      </div>
+      <div style="align-self:end;display:flex;gap:12px;align-items:center">
+  <button onclick="filtrarEnviadas()" style="padding:8px 16px;background:#0a0;color:white;border:none;font-size:14px">
+    🔍 Buscar
+  </button>
+
+  <label class="switch-oficina">
+  <input type="checkbox" id="filtroOficinaTop">
+  <span class="slider"></span>
+  <span class="label-text">Oficina arriba</span>
+</label>
+</div>
     </div>
 
-    <div style="color:#00ff00;font-weight:bold;font-size:22px;margin-bottom:12px">
-      Total: <span class="total-enviadas">$0</span>
-    </div>
+    <div class="resumen-wrapper">
+  <div style="color:#00ff00;font-weight:bold;font-size:22px">
+    Total: <span class="total-enviadas">$0</span>
+  </div>
+
+  <div class="resumen-tickets">
+    Tickets: <span class="tickets-enviadas">0</span>
+  </div>
+</div>
 
     <div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;background:#1e1e1e;font-family:monospace;font-size:15px">
@@ -2700,15 +2730,25 @@ function mostrarJugadasEnviadas() {
       </table>
     </div>
   `;
+  // ✅ Toggle "Oficina arriba" (enganchar DESPUÉS del innerHTML)
+  const chkOfi = document.getElementById('filtroOficinaTop');
+  if (chkOfi) {
+    // (opcional) restaurar estado guardado
+    chkOfi.checked = localStorage.getItem('ofiTop') === '1';
 
-  renderizarFiltradas(jugadasEnviadas);
+    chkOfi.onchange = () => {
+      localStorage.setItem('ofiTop', chkOfi.checked ? '1' : '0');
+      filtrarEnviadas(); // re-render con el filtro actual (fecha/ticket) sin romper nada
+    };
+  }
+  const listaVisible = fechaSeleccionada
+  ? jugadasEnviadas.filter(t => t.fecha === fechaSeleccionada)
+  : (jugadasEnviadas || []);
 
-  // 🔁 Actualizar total con filtro por fecha
-  const totalFiltrado = jugadasEnviadas
-    .filter(t => !t.anulado && (!fechaSeleccionada || t.fecha === fechaSeleccionada))
-    .reduce((acc, t) => acc + t.total, 0);
+const listaOrdenada = aplicarOrdenOficinaTop(listaVisible);
 
-  document.querySelector('.total-enviadas').innerText = `$${totalFiltrado.toLocaleString('es-AR')}`;
+renderizarFiltradas(listaOrdenada);
+actualizarResumenEnviadas(listaOrdenada);
 }
   
 function renderizarFiltradas(lista) {
@@ -2794,7 +2834,27 @@ function renderizarFiltradas(lista) {
     }
   });
 }
-  
+  function aplicarOrdenOficinaTop(lista) {
+  const chk = document.getElementById('filtroOficinaTop');
+  const activo = chk && chk.checked;
+
+  if (!activo) return lista || [];
+
+  const oficina = [];
+  const normal = [];
+
+  (lista || []).forEach(t => {
+    const n = Number(t?.numero);
+    if (Number.isFinite(n) && n >= 10000) {
+      oficina.push(t);
+    } else {
+      normal.push(t);
+    }
+  });
+
+  // oficina arriba, el resto abajo SIN tocar el orden interno
+  return oficina.concat(normal);
+}
 async function filtrarEnviadas() {
   const inputFecha = document.getElementById('filtroFecha');
   if (!inputFecha) {
@@ -2816,7 +2876,9 @@ async function filtrarEnviadas() {
       </tr>
     `;
     document.querySelector('.total-enviadas').innerText = `$0`;
-    return;
+const tk = document.querySelector('.tickets-enviadas');
+if (tk) tk.innerText = '0';
+return;
   }
     const ticketInput = document.getElementById('filtroTicket').value;
     const vendedor = localStorage.getItem('claveVendedor');
@@ -2844,7 +2906,7 @@ async function filtrarEnviadas() {
       const datos = await resp.json();
       jugadasEnviadas = datos;
       datos.sort((a, b) => a.hora.localeCompare(b.hora));
-      renderizarFiltradas(datos);
+      renderizarFiltradas(aplicarOrdenOficinaTop(datos));
       jugadasEnviadas = datos;
 
       const fechaSeleccionada = document.getElementById('filtroFecha').value;
@@ -2853,6 +2915,8 @@ async function filtrarEnviadas() {
         .reduce((acc, t) => acc + t.total, 0);
 
       document.querySelector('.total-enviadas').innerText = `$${totalFiltrado.toLocaleString('es-AR')}`;
+      const cantFiltrado = datos.filter(t => !t.anulado && (!fechaSeleccionada || t.fecha === fechaSeleccionada)).length;
+document.querySelector('.tickets-enviadas').innerText = String(cantFiltrado);
       // 🔄 Refrescar aciertos desde Supabase
 const resAciertos = await fetch(`https://agithblutrkibaydjbsl.supabase.co/rest/v1/aciertos?fecha=eq.${fechaInput}`, {
   headers: {

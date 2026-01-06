@@ -1683,3 +1683,68 @@ td,th{ padding:8px 10px; white-space:nowrap; }
   }
   body.sidebar-open .sidebar-overlay { display: block; }
 }
+.switch-oficina {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 15px;
+  color: #e0e0e0;
+}
+
+.switch-oficina input {
+  display: none;
+}
+
+.switch-oficina .slider {
+  width: 46px;
+  height: 26px;
+  background: #333;
+  border-radius: 20px;
+  position: relative;
+  transition: background 0.25s ease;
+}
+
+.switch-oficina .slider::before {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 3px;
+  top: 3px;
+  background: #bbb;
+  border-radius: 50%;
+  transition: transform 0.25s ease, background 0.25s ease;
+}
+
+.switch-oficina input:checked + .slider {
+  background: linear-gradient(135deg, #00ff88, #00cc66);
+}
+
+.switch-oficina input:checked + .slider::before {
+  transform: translateX(20px);
+  background: #fff;
+}
+
+.switch-oficina .label-text {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.resumen-tickets {
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.resumen-tickets .tickets-enviadas {
+  color: #ffffff;
+  font-size: 22px;
+}
+.resumen-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  margin-bottom: 12px;
+}

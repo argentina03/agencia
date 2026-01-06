@@ -5321,7 +5321,11 @@ async function mostrarJugadasEnviadasAdmin() {
         <input id="jv_ticket" type="number" placeholder="Opcional" style="padding:6px;width:120px">
 
         <button id="jv_buscar" style="padding:6px 10px">Buscar</button>
-
+<div id="jv_stats" style="display:flex;align-items:center;gap:10px;margin-left:10px;color:#ddd;font-weight:600">
+  <span>Tickets: <span id="jv_cnt" style="color:#7CFC9A">0</span></span>
+  <span style="opacity:.6">|</span>
+  <span>Monto: <span id="jv_sum" style="color:#7CFC9A">$0</span></span>
+</div>
         <div style="margin-left:auto;display:flex;gap:8px">
           <button id="jv_del_sel" style="padding:6px 10px;background:#d35454;color:#fff;border:none;border-radius:6px">🗑 Eliminar seleccionados</button>
         </div>
@@ -5922,7 +5926,12 @@ if (topStatus && topBox){
   }
 }
 /***** ===================== FIN 📈 CONTROL GENERAL — ADMIN (v2) ===================== *****/
-
+function JV_setStats(count, sum) {
+  const elCnt = document.getElementById('jv_cnt');
+  const elSum = document.getElementById('jv_sum');
+  if (elCnt) elCnt.textContent = String(count || 0);
+  if (elSum) elSum.textContent = '$' + fmt1(Number(sum || 0));
+}
 async function buscarJugadasEnviadas() {
   const tbody = document.getElementById('jv_rows');
   if (!tbody) return;
@@ -5933,6 +5942,7 @@ async function buscarJugadasEnviadas() {
   const ticketN = (document.getElementById('jv_ticket').value || '').trim();
 
   tbody.innerHTML = `<tr><td colspan="10" style="padding:10px;text-align:center;color:#888">Buscando…</td></tr>`;
+  JV_setStats('…', '…');
 
   try {
     let q = supabase
@@ -5989,8 +5999,14 @@ if (error) {
 }
 if (!data || !data.length) {
   tbody.innerHTML = `<tr><td colspan="10" style="padding:10px;text-align:center;color:#888">No hay jugadas.</td></tr>`;
+  JV_setStats(0, 0);
   return;
 }
+// ✅ stats: tickets + monto total (solo NO anulados)
+const rowsOk = (data || []).filter(r => !r.anulado);
+const cant = rowsOk.length;
+const suma = rowsOk.reduce((acc, r) => acc + (Number(r.total) || 0), 0);
+JV_setStats(cant, suma);
     tbody.innerHTML = '';
     data.forEach(r => {
       // jugadas puede venir string
@@ -6051,6 +6067,7 @@ const estadoTitle = r.anulado
   } catch (e) {
     console.error(e);
     tbody.innerHTML = `<tr><td colspan="10" style="padding:10px;text-align:center;color:#c33">Error al buscar.</td></tr>`;
+    JV_setStats(0, 0);
   }
 }
 
