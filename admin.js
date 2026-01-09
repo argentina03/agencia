@@ -1251,15 +1251,35 @@ async function mostrarCargaJugadasAdmin() {
 
     <h1>Carga de Jugadas (Admin)</h1>
 
-    <!-- Fecha & Pasador -->
-    <div style="display:flex;gap:12px;align-items:center;margin:10px 0 16px">
-      <label style="color:#bbb">Fecha del ticket:</label>
-      <input type="date" id="fechaTicketAdmin" value="${hoy}" style="padding:6px">
-      <label style="color:#bbb;margin-left:12px">Pasador:</label>
-      <select id="selectPasadorAdmin" style="padding:6px">
-  <option value="">Seleccionar</option>
-</select>
-    </div>
+    <!-- Fecha & Pasador (TODO en una línea) -->
+<div style="display:flex;align-items:center;gap:14px;margin:10px 0 16px;flex-wrap:nowrap;width:100%">
+
+  <div style="display:flex;align-items:center;gap:10px;flex:0 0 auto;white-space:nowrap">
+    <label style="color:#bbb">Fecha del ticket:</label>
+    <input
+      type="date"
+      id="fechaTicketAdmin"
+      value="${hoy}"
+      style="padding:6px;width:170px;min-width:170px;max-width:170px;flex:0 0 auto;display:inline-block"
+    >
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;flex:0 0 auto;white-space:nowrap">
+    <label style="color:#bbb">Pasador:</label>
+    <select
+      id="selectPasadorAdmin"
+      style="padding:6px;width:160px;min-width:160px;max-width:160px;flex:0 0 auto;display:inline-block"
+    >
+      <option value="">Seleccionar</option>
+    </select>
+  </div>
+
+  <label style="display:flex;align-items:center;gap:10px;color:#bbb;flex:0 0 auto;white-space:nowrap;margin-left:6px">
+    <input type="checkbox" id="keepPasadorAdmin" style="width:18px;height:18px;flex:0 0 auto">
+    Mantener pasador
+  </label>
+
+</div>
 
     <div class="cuadro-abreviaciones">
       <div><strong>NAC</strong> = NACIONAL</div>
@@ -1466,12 +1486,14 @@ async function getPasadores(){
   }
 }
 const PASADOR_LS_KEY = `pasador_sel_${window.USUARIO_ACTUAL}`;
+const KEEP_PASADOR_LS_KEY = `keep_pasador_${window.USUARIO_ACTUAL}`;
 // Rellena el combo con la lista + opción "Agregar..."
 function fillPasadoresSelect(pasadores){
   const sel = document.getElementById('selectPasadorAdmin');
   if (!sel) return;
 
-  const remembered = localStorage.getItem(PASADOR_LS_KEY) || '';
+  const keep = localStorage.getItem(KEEP_PASADOR_LS_KEY) === '1';
+const remembered = keep ? (localStorage.getItem(PASADOR_LS_KEY) || '') : '';
   sel.innerHTML = '';
 
   // (Seleccionar)
@@ -1488,10 +1510,7 @@ function fillPasadoresSelect(pasadores){
   });
 
   // “Agregar pasador…”
-  const onew = document.createElement('option');
-  onew.value = '__nuevo__';
-  onew.textContent = '➕ Agregar pasador…';
-  sel.appendChild(onew);
+  
 
   // si lo recordado NO está en la lista y NO sos central → no lo muestres
   if (remembered && (window.ES_CENTRAL || pasadores.includes(remembered))) {
@@ -1527,7 +1546,23 @@ async function insertarPasador(nombre){
 async function setupPasadoresAdmin(){
   const sel = document.getElementById('selectPasadorAdmin');
   if (!sel) return;
+const keepCb = document.getElementById('keepPasadorAdmin');
+if (keepCb) {
+  keepCb.checked = (localStorage.getItem(KEEP_PASADOR_LS_KEY) === '1');
 
+  keepCb.onchange = () => {
+    if (keepCb.checked) {
+      localStorage.setItem(KEEP_PASADOR_LS_KEY, '1');
+      if (sel.value && sel.value !== '__nuevo__') {
+        localStorage.setItem(PASADOR_LS_KEY, sel.value);
+      }
+    } else {
+      localStorage.removeItem(KEEP_PASADOR_LS_KEY);
+      localStorage.removeItem(PASADOR_LS_KEY);
+      sel.value = ''; // ✅ obligar a elegir de nuevo
+    }
+  };
+}
   // Llenado inicial
   const lista = await getPasadores();
   fillPasadoresSelect(lista);
@@ -1553,9 +1588,18 @@ async function setupPasadoresAdmin(){
       }
     }
     // Guardar selección (si no es vacío ni "__nuevo__")
-    if (sel.value && sel.value !== '__nuevo__'){
-      localStorage.setItem(PASADOR_LS_KEY, sel.value);
-    }
+    const keepCb = document.getElementById('keepPasadorAdmin');
+const keep = keepCb ? keepCb.checked : (localStorage.getItem(KEEP_PASADOR_LS_KEY) === '1');
+
+if (keep) {
+  localStorage.setItem(KEEP_PASADOR_LS_KEY, '1');
+  if (sel.value && sel.value !== '__nuevo__') {
+    localStorage.setItem(PASADOR_LS_KEY, sel.value);
+  }
+} else {
+  localStorage.removeItem(KEEP_PASADOR_LS_KEY);
+  localStorage.removeItem(PASADOR_LS_KEY);
+}
   };
 
   // Realtime: refresca y mantiene el seleccionado (fillPasadoresSelect ya respeta LS)
@@ -2628,21 +2672,33 @@ if (ticket.id) {
   }, 30);
 }
 // 🔄 limpiar selección y campos después de enviar ticket
-  try {
-    document.querySelectorAll('.casilla-sorteo-admin.activo').forEach(c => c.classList.remove('activo'));
-    document.querySelectorAll('.jugada-inputs input').forEach(inp => inp.value = '');
-    const lista = document.getElementById('listaJugadasAdmin');
-    if (lista) lista.innerHTML = '';
-  } catch (e) {
-    console.warn('⚠️ Error limpiando la interfaz después de enviar el ticket:', e);
+try {
+  document.querySelectorAll('.casilla-sorteo-admin.activo').forEach(c => c.classList.remove('activo'));
+  document.querySelectorAll('.jugada-inputs input').forEach(inp => inp.value = '');
+  const lista = document.getElementById('listaJugadasAdmin');
+  if (lista) lista.innerHTML = '';
+} catch (e) {
+  console.warn('⚠️ Error limpiando la interfaz después de enviar el ticket:', e);
+}
+
+// ✅ Reset pasador si NO quiere mantenerlo
+try {
+  const keep = document.getElementById('keepPasadorAdmin')?.checked === true;
+  if (!keep) {
+    const sel = document.getElementById('selectPasadorAdmin');
+    if (sel) sel.value = '';
+    localStorage.removeItem(KEEP_PASADOR_LS_KEY);
+    localStorage.removeItem(PASADOR_LS_KEY);
   }
-    } finally {
-    window.__ENVIANDO_TICKET_ADMIN = false;
-    if (__btnEnviar) {
-      __btnEnviar.disabled = false;
-      __btnEnviar.textContent = __txtOriginal || 'Enviar';
-    }
+} catch(_) {}
+
+} finally {
+  window.__ENVIANDO_TICKET_ADMIN = false;
+  if (__btnEnviar) {
+    __btnEnviar.disabled = false;
+    __btnEnviar.textContent = __txtOriginal || 'Enviar';
   }
+}
 }
 
 
@@ -5629,6 +5685,7 @@ async function mostrarControlGeneral(){
         <input type="checkbox" id="cg_arr_rango" style="width:18px;height:18px">
 
         <button id="cg_buscar" style="padding:6px 12px">Actualizar</button>
+        <button id="cg_ver_control" style="padding:6px 12px;background:#222;border:1px solid #444;color:#fff;border-radius:8px">Ver control</button>
       </div>
     </div>
   </div>
@@ -5651,6 +5708,490 @@ async function mostrarControlGeneral(){
   await cargarVendedoresPermitidosEnSelect(document.getElementById('cg_vend'));
   document.getElementById('cg_buscar').onclick = refrescar;
   await refrescar();
+    // ========= Ver Control (modal) — v4 (centrado, aireado, no amontonado, ticket con ID real) =========
+
+// Snapshot para descargar
+let __cgVC_last = null;
+
+// helpers
+function _vc_money(n){
+  const x = Number(n)||0, neg = x<0, abs = Math.abs(x);
+  return (neg?'-':'') + '$' + abs.toLocaleString('es-AR',{maximumFractionDigits:0});
+}
+function _vc_escape(s){
+  return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// Modal HTML + CSS (responsive)
+zona.insertAdjacentHTML('beforeend', `
+  <style id="cgVC_style">
+    .cgVC_modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;place-items:start center;padding:60px 14px;overflow:auto}
+    .cgVC_shell{width:min(1400px,96vw);background:#0b0b0b;border:1px solid #2b2b2b;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.55);padding:14px}
+    .cgVC_head{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .cgVC_title{color:#fff;font-weight:1000;font-size:18px}
+    .cgVC_sub{color:#9aa;font-size:12px;margin-top:2px}
+    .cgVC_actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .cgVC_btnP{padding:8px 12px;background:#1f6feb;border:none;color:#fff;border-radius:10px;font-weight:1000;cursor:pointer}
+    .cgVC_btnS{padding:8px 12px;background:#222;border:1px solid #444;color:#fff;border-radius:10px;cursor:pointer}
+    .cgVC_tip{color:#666;font-size:12px}
+    .cgVC_grid{margin-top:12px;display:grid;grid-template-columns:repeat(3,minmax(320px,1fr));gap:12px;align-items:start}
+    .cgVC_col{background:#0a0a0a;border:1px solid #222;border-radius:14px;padding:12px;min-height:260px}
+    .cgVC_colHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+    .cgVC_colHead h3{margin:0;color:#fff;font-weight:1000;font-size:15px;letter-spacing:.4px;text-transform:uppercase}
+    .cgVC_colHead span{color:#aaa;font-size:12px}
+    .cgVC_list{display:flex;flex-direction:column;gap:14px}
+    .cgVC_item{border:1px solid #222;background:#090909;border-radius:14px;padding:12px}
+    .cgVC_rank{font-weight:1000;color:#fff;font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+    .cgVC_rankBox{width:40px;height:40px;border-radius:12px;background:#111;border:1px solid #2b2b2b;display:flex;align-items:center;justify-content:center;font-weight:1000}
+    .cgVC_itemGrid{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  align-items:stretch;
+}
+    .cgVC_ticketWrap{display:flex;justify-content:center;align-items:flex-start}
+    .cgVC_ticketBox{
+  background:#fff;
+  border-radius:14px;
+  padding:12px;
+  max-width:100%;
+  overflow:auto;
+}
+    .cgVC_badge{
+  padding:12px;
+  border-radius:14px;
+  border:1px solid #2b2b2b;
+  background:#111;
+  max-width:100%;
+}
+    .cgVC_badge small{display:block;color:#9aa;font-size:11px;font-weight:900;letter-spacing:.4px;margin-bottom:4px}
+    .cgVC_badge b{display:block;color:#fff;font-weight:1000;font-size:22px;line-height:1.1}
+    .cgVC_gold{color:#ffd86b}
+    @media (max-width: 1050px){
+      .cgVC_grid{grid-template-columns:1fr}
+      .cgVC_itemGrid{grid-template-columns:1fr}
+      .cgVC_ticketWrap{justify-content:flex-start}
+    }
+  </style>
+
+  <div id="cgVC_modal" class="cgVC_modal">
+    <div class="cgVC_shell">
+
+      <div class="cgVC_head">
+        <div>
+          <div class="cgVC_title">🧾 Ver control</div>
+          <div id="cgVC_sub" class="cgVC_sub"></div>
+        </div>
+
+        <div class="cgVC_actions">
+          <button id="cgVC_desc" class="cgVC_btnP">Descargar</button>
+          <button id="cgVC_cerrar" class="cgVC_btnS">Cerrar</button>
+        </div>
+      </div>
+
+      <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span id="cgVC_msg" style="color:#9ad"></span>
+        <span class="cgVC_tip">Tip: si elegís un pasador en el filtro del Control General, esto se calcula solo para ese pasador.</span>
+      </div>
+
+      <div class="cgVC_grid">
+        <div class="cgVC_col">
+          <div class="cgVC_colHead">
+            <h3>TOP 10 POR MONTO (DÍA)</h3>
+            <span>día completo</span>
+          </div>
+          <div id="cgVC_col_monto"></div>
+        </div>
+
+        <div class="cgVC_col">
+          <div class="cgVC_colHead">
+            <h3>TOP 10 GANANCIA TOTAL (ACTIVOS)</h3>
+            <span>solo activos</span>
+          </div>
+          <div id="cgVC_col_total"></div>
+        </div>
+
+        <div class="cgVC_col">
+          <div class="cgVC_colHead">
+            <h3>TOP 10 GANANCIA INDIVIDUAL (ACTIVOS)</h3>
+            <span>solo activos</span>
+          </div>
+          <div id="cgVC_col_ind"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+`);
+
+// --- cerrados del día (resultados)
+async function VC_getCerradosSet(fechaISO){
+  const { data, error } = await supabase
+    .from('resultados')
+    .select('loteria,horario')
+    .eq('fecha', fechaISO);
+
+  if (error) { console.warn('VC resultados', error); return new Set(); }
+  const set = new Set();
+  (data||[]).forEach(r=>{
+    const sigla = String(r.loteria||'').toUpperCase().trim();
+    const hora  = String(r.horario||'').trim();
+    const hC = CG_horaCierre(hora);
+    if (sigla && hC) set.add(`${fechaISO}__${sigla}__${hC}`);
+  });
+  return set;
+}
+
+function VC_ticketResumen(t){
+  let jugadas = t.jugadas;
+  try{ if (typeof jugadas === 'string') jugadas = JSON.parse(jugadas); }catch{ }
+  jugadas = Array.isArray(jugadas) ? jugadas : [];
+
+  // Total del ticket (monto apostado real)
+  let total = Number(t.total)||0;
+  if (!total){
+    // si no viene total, calculo "lo más probable":
+    // si el importe ya venía multiplicado por loterías no lo puedo adivinar perfecto,
+    // pero acá NO afecta a ganancias; solo al "MONTO".
+    total = jugadas.reduce((s,j)=> s + (Number(j.importe)||0), 0);
+  }
+
+  // ✅ Ganancias: SIEMPRE "como si todo fuera en una sola lotería"
+  let potTotal = 0;   // suma de premios unitarios de todas las jugadas (1 sola lotería)
+  let potMaxInd = 0;  // máximo premio unitario de una jugada (1 sola lotería)
+
+  const lotesSet = new Set();
+
+  for (const j of jugadas){
+    const imp = Number(j.importe)||0;
+    if (imp <= 0) continue;
+
+    // premio unitario por 1 lotería
+    let pUnit = CG_premioPotencial(j.numero, imp);
+
+    // si hay redoblona, cuenta también (como en el monitor)
+    if (j.redoblona) pUnit += CG_premioPotencial(j.redoblona, imp);
+
+    potTotal += pUnit;
+    if (pUnit > potMaxInd) potMaxInd = pUnit;
+
+    const lotes = Array.isArray(j.loterias) ? j.loterias : [];
+    lotes.forEach(code=>{
+      const { sigla, hora } = CG_parseLote(code);
+      if (sigla && hora) lotesSet.add(`${sigla} ${hora}`);
+      else if (sigla) lotesSet.add(`${sigla}`);
+    });
+  }
+
+  return {
+    id: t.id,
+    numero: t.numero ?? t.id,
+    vendedor: t.vendedor,
+    fecha: t.fecha,
+    hora: t.hora,
+    total,
+    potTotal,
+    potMaxInd,
+    lotesTxt: [...lotesSet].sort().join(' · '),
+    raw: { ...t, jugadas }
+  };
+}
+
+function VC_esTicketActivo(tResumen, cerradosSet){
+  if (tResumen.fecha !== CG_hoyISO()) return true;
+
+  if (!tResumen.lotesTxt){
+    const h = CG_horaCierre(tResumen.hora);
+    return h ? CG_esPendiente(tResumen.fecha, 'UNK', h, new Set()) : true;
+  }
+
+  const parts = tResumen.lotesTxt.split(' · ').map(x=>x.trim()).filter(Boolean);
+  for (const p of parts){
+    const mm = p.match(/^([A-Z]{2,4})\s+(\d{2}:\d{2})$/);
+    if (!mm) continue;
+    const sigla = mm[1];
+    const horaCierre = mm[2];
+    if (CG_esPendiente(tResumen.fecha, sigla, horaCierre, cerradosSet)) return true;
+  }
+  return false;
+}
+
+function VC_badgeHTML(r, modo){
+  if (modo === 'monto') {
+    return `<div class="cgVC_badge">
+      <small>MONTO</small>
+      <b style="color:#4ade80">${_vc_money(r.total)}</b>
+    </div>`;
+  }
+  if (modo === 'total') {
+    return `<div class="cgVC_badge">
+      <small>POSIBLE GANANCIA TOTAL</small>
+      <b class="cgVC_gold">${_vc_money(r.potTotal)}</b>
+    </div>`;
+  }
+  return `<div class="cgVC_badge">
+    <small>POSIBLE GANANCIA INDIVIDUAL</small>
+    <b class="cgVC_gold">${_vc_money(r.potMaxInd)}</b>
+  </div>`;
+}
+
+// LISTA (modal): rank + ticket centrado + badge
+function VC_listHTML(items, modo){
+  if (!items || !items.length){
+    return `<div style="color:#888;padding:12px;border:1px dashed #333;border-radius:12px">Sin datos</div>`;
+  }
+
+  return `
+    <div class="cgVC_list">
+      ${items.map((r,i)=>{
+        const t = r.raw || {};
+
+        // ✅ ticketObj SIEMPRE con id real (para que sea idéntico)
+        const ticketObj = {
+          id: t.id ?? r.id,
+          numero: t.numero ?? r.numero ?? r.id,
+          fecha: t.fecha || r.fecha,
+          hora:  t.hora  || r.hora,
+          vendedor: t.vendedor || r.vendedor,
+          jugadas: t.jugadas || [],
+          total: t.total ?? r.total
+        };
+
+        let ticketHTML = renderTicketHTMLAdmin(ticketObj);
+        ticketHTML = String(ticketHTML || '')
+          .replace(/$begin:math:text$ID pendiente\\\.\\\.\\\.$end:math:text$/gi,'')
+          .replace(/ID pendiente\.\.\./gi,'');
+
+        return `
+  <div class="cgVC_item">
+    <div class="cgVC_rank">
+      <div class="cgVC_rankBox">#${i+1}</div>
+      <div style="color:#9aa;font-size:12px;font-weight:900;letter-spacing:.4px;text-transform:uppercase">
+        ${modo==='monto' ? 'Top por monto (día)' : (modo==='total' ? 'Top ganancia total (activos)' : 'Top ganancia individual (activos)')}
+      </div>
+    </div>
+
+    <div class="cgVC_itemGrid">
+      <div class="cgVC_ticketWrap">
+        <div class="cgVC_ticketBox">
+          <!-- 👇 NO achico en modal, solo evito que empuje y se pise -->
+          <div style="display:inline-block">
+            ${ticketHTML}
+          </div>
+        </div>
+      </div>
+
+      <!-- ✅ badge ABAJO, siempre visible, nunca cortado -->
+      ${VC_badgeHTML(r, modo)}
+    </div>
+  </div>
+`;
+      }).join('')}
+    </div>
+  `;
+}
+
+// HTML para descargar (3 columnas, aireado, responsive)
+function VC_buildDownloadHTML(payload){
+  const { meta, topMonto, topPotTotal, topPotInd } = payload;
+
+  const col = (titulo, items, modo) => `
+    <div style="flex:1;min-width:360px;border:1px solid #ddd;border-radius:14px;padding:14px;background:#fff">
+      <div style="font-size:18px;font-weight:1000;letter-spacing:.8px;text-transform:uppercase;margin:0 0 12px">
+        ${_vc_escape(titulo)}
+      </div>
+      ${VC_downloadList(items, modo)}
+    </div>
+  `;
+
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CTRL-ARGENTINA - ${_vc_escape(meta.fecha)} ${_vc_escape(meta.horaSnap)}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; color:#111;background:#fff;margin:16px">
+  <div style="max-width:1400px;margin:0 auto">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <div>
+        <div style="font-size:34px;font-weight:1000;letter-spacing:1px">CTRL-ARGENTINA</div>
+        <div style="color:#444;margin-top:4px;font-size:14px">
+          Fecha: <b>${_vc_escape(meta.fecha)}</b> · Hora: <b>${_vc_escape(meta.horaSnap)}</b> · Pasador: <b>${_vc_escape(meta.vend || 'Todos')}</b>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+      ${col('TOP 10 POR MONTO (DÍA)', topMonto, 'monto')}
+      ${col('TOP 10 GANANCIA TOTAL (ACTIVOS)', topPotTotal, 'total')}
+      ${col('TOP 10 GANANCIA INDIVIDUAL (ACTIVOS)', topPotInd, 'ind')}
+    </div>
+
+    <div style="margin-top:14px;color:#777;font-size:12px">Generado por admin.js</div>
+  </div>
+</body>
+</html>`;
+}
+
+// listita para el HTML descargado
+function VC_downloadList(items, modo){
+  if (!items || !items.length) return `<div style="color:#777">Sin datos</div>`;
+
+  const badgeBlock = (r)=>{
+    if (modo==='monto') return `
+      <div style="margin-top:8px;padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#f8fafc">
+        <div style="font-weight:1000;letter-spacing:.4px">MONTO</div>
+        <div style="font-weight:1000;font-size:22px;color:#16a34a">${_vc_money(r.total)}</div>
+      </div>`;
+    if (modo==='total') return `
+      <div style="margin-top:8px;padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#f8fafc">
+        <div style="font-weight:1000;letter-spacing:.4px">GANANCIA TOTAL</div>
+        <div style="font-weight:1000;font-size:22px;color:#b45309">${_vc_money(r.potTotal)}</div>
+      </div>`;
+    return `
+      <div style="margin-top:8px;padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#f8fafc">
+        <div style="font-weight:1000;letter-spacing:.4px">GANANCIA INDIV.</div>
+        <div style="font-weight:1000;font-size:22px;color:#b45309">${_vc_money(r.potMaxInd)}</div>
+      </div>`;
+  };
+
+  return items.map((r,i)=>{
+    const t = r.raw || {};
+
+    const ticketObj = {
+      id: t.id ?? r.id,
+      numero: t.numero ?? r.numero ?? r.id,
+      fecha: t.fecha || r.fecha,
+      hora:  t.hora  || r.hora,
+      vendedor: t.vendedor || r.vendedor,
+      jugadas: t.jugadas || [],
+      total: t.total ?? r.total
+    };
+
+    let ticketHTML = renderTicketHTMLAdmin(ticketObj);
+    ticketHTML = String(ticketHTML || '')
+      .replace(/\(ID pendiente\.\.\.\)/gi,'')
+      .replace(/ID pendiente\.\.\./gi,'');
+
+    return `
+      <div style="border:1px solid #e5e7eb;border-radius:16px;padding:14px;margin:0 0 14px;background:#fff">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="width:44px;height:44px;border-radius:14px;background:#111827;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:1000;font-size:20px">
+            #${i+1}
+          </div>
+          <div style="color:#374151;font-weight:1000;letter-spacing:.4px;text-transform:uppercase">
+            ${modo==='monto' ? 'TOP MONTO' : (modo==='total' ? 'TOP GANANCIA TOTAL' : 'TOP GANANCIA INDIV.')}
+          </div>
+        </div>
+
+        ${badgeBlock(r)}
+
+        <div style="margin-top:12px;border:1px solid #e5e7eb;border-radius:16px;padding:12px;background:#fff;display:flex;justify-content:center;overflow:hidden">
+  <div style="transform:scale(.82);transform-origin:top center;display:inline-block">
+    ${ticketHTML}
+  </div>
+</div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function VC_buildSnapshot(vend){
+  const fecha = CG_hoyISO();
+
+  let q = supabase
+    .from('jugadas_enviadas')
+    .select('id, numero, fecha, hora, vendedor, total, anulado, jugadas')
+    .eq('fecha', fecha)
+    .eq('anulado', false);
+
+  if (vend) q = q.eq('vendedor', vend);
+  else if (!window.ES_CENTRAL){
+    const permitidos = await vendedoresPermitidos();
+    if (permitidos && permitidos.length) q = q.in('vendedor', permitidos);
+    else return { meta:{fecha, horaSnap:'-', vend}, topMonto:[], topPotTotal:[], topPotInd:[] };
+  }
+
+  const [{ data: tickets, error }, cerradosSet] = await Promise.all([
+    q,
+    VC_getCerradosSet(fecha),
+  ]);
+
+  if (error) { console.warn('VC tickets', error); return { meta:{fecha, horaSnap:'-', vend}, topMonto:[], topPotTotal:[], topPotInd:[] }; }
+
+  const rows = (tickets||[]).map(VC_ticketResumen);
+
+  const topMonto = [...rows].sort((a,b)=> (b.total-a.total)).slice(0,10);
+
+  const activos = rows.filter(r => VC_esTicketActivo(r, cerradosSet));
+
+  const topPotTotal = [...activos].sort((a,b)=> (b.potTotal-a.potTotal)).slice(0,10);
+  const topPotInd   = [...activos].sort((a,b)=> (b.potMaxInd-a.potMaxInd)).slice(0,10);
+
+  const now = CG_ahoraAR();
+  const horaSnap = now.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+
+  return { meta: { fecha, horaSnap, vend }, topMonto, topPotTotal, topPotInd };
+}
+
+async function VC_open(){
+  const modal = document.getElementById('cgVC_modal');
+  const sub   = document.getElementById('cgVC_sub');
+  const msg   = document.getElementById('cgVC_msg');
+  const vend  = document.getElementById('cg_vend')?.value || '';
+
+  modal.style.display = 'grid';
+  msg.textContent = 'Cargando…';
+
+  __cgVC_last = await VC_buildSnapshot(vend);
+
+  sub.textContent = `Fecha ${__cgVC_last.meta.fecha} · Snapshot ${__cgVC_last.meta.horaSnap} · Pasador: ${__cgVC_last.meta.vend || 'Todos'}`;
+
+  document.getElementById('cgVC_col_monto').innerHTML =
+    VC_listHTML(__cgVC_last.topMonto, 'monto');
+
+  document.getElementById('cgVC_col_total').innerHTML =
+    VC_listHTML(__cgVC_last.topPotTotal, 'total');
+
+  document.getElementById('cgVC_col_ind').innerHTML =
+    VC_listHTML(__cgVC_last.topPotInd, 'ind');
+
+  msg.textContent = '';
+}
+
+function VC_close(){
+  const modal = document.getElementById('cgVC_modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function VC_download(){
+  if (!__cgVC_last) return;
+  const html = VC_buildDownloadHTML(__cgVC_last);
+  const blob = new Blob([html], { type:'text/html;charset=utf-8' });
+  const a = document.createElement('a');
+
+  const vend = __cgVC_last.meta.vend || 'TODOS';
+  a.href = URL.createObjectURL(blob);
+
+  // ✅ nombre nuevo
+  a.download = `CTRL-ARGENTINA_${__cgVC_last.meta.fecha}_${__cgVC_last.meta.horaSnap.replace(':','')}_${vend}.html`;
+
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+}
+
+// Wiring
+document.getElementById('cg_ver_control').onclick = VC_open;
+document.getElementById('cgVC_cerrar').onclick = VC_close;
+document.getElementById('cgVC_desc').onclick = VC_download;
+
+// Cerrar clic afuera
+document.getElementById('cgVC_modal').addEventListener('click', (e)=>{
+  if (e.target && e.target.id === 'cgVC_modal') VC_close();
+});
 
   async function refrescar(){
     const desde = document.getElementById('cg_desde').value || CG_hoyISO();
