@@ -1920,6 +1920,13 @@ if (isEnterKey(e)){
           if (i === 0){ if (!val(1)) inputs[1].value = '1'; inputs[2]?.focus(); inputs[2]?.select?.(); return; }
           if (i === 2){ inputs[3]?.focus(); inputs[3]?.select?.(); return; }
           const rn = val(3), rp = val(4);
+          // ⚡ ATAJO ADMIN: Enter en número redoblona vacío → agregar jugada
+if (i === 3 && !rn && !rp) {
+  get('btnAgregarAdmin')?.click();
+  inputs[0]?.focus();
+  inputs[0]?.select?.();
+  return;
+}
           if (i === 3 && rn && !rp){ inputs[4]?.focus(); inputs[4]?.select?.(); return; }
           if (i === 4 && !rn && rp){ inputs[3]?.focus(); inputs[3]?.select?.(); return; }
 

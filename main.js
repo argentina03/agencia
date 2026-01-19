@@ -1681,6 +1681,91 @@ z-index: 9999; background: white; padding: 24px; border: 3px solid black; max-wi
       
     `;
 
+    // 🔹 Modal reutilizable (igual al admin)
+    if (!document.getElementById('resModal')) {
+      document.body.insertAdjacentHTML('beforeend', `
+        <div id="resModal" style="
+          display:none;
+          position:fixed;
+          inset:0;
+          background:rgba(0,0,0,.6);
+          z-index:9999;
+          place-items:center;
+        ">
+          <div id="resModalBox" style="
+            position:relative;
+            background:#0b0b0b;
+            border:1px solid #444;
+            border-radius:12px;
+            padding:16px;
+            max-width:320px;
+            width:100%;
+          ">
+    
+            <!-- ❌ cerrar -->
+            <div id="resModalClose"
+              style="
+                position:absolute;
+                top:10px;
+                right:12px;
+                cursor:pointer;
+                color:#aaa;
+                font-size:20px;
+                font-weight:900;
+                user-select:none;
+              ">
+              ✕
+            </div>
+    
+            <!-- título -->
+            <div id="mTitulo"
+              style="color:#fff;font-size:20px;font-weight:800;margin-bottom:14px">
+            </div>
+    
+            <!-- lista -->
+            <div id="mLista"></div>
+    
+            <!-- botones -->
+            <div style="text-align:right;margin-top:14px">
+              <button id="mCerrar"
+                style="padding:8px 16px;border-radius:6px;border:none">
+                Cerrar
+              </button>
+            </div>
+    
+            <!-- ☰ manija mover -->
+            <div id="resModalDrag"
+              title="Mover"
+              style="
+                position:absolute;
+                bottom:10px;
+                left:10px;
+                width:26px;
+                height:26px;
+                border-radius:6px;
+                background:#222;
+                border:1px solid #444;
+                color:#bbb;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                cursor:grab;
+                user-select:none;
+              ">
+              ☰
+            </div>
+    
+          </div>
+        </div>
+      `);
+    
+      // cerrar modal
+      document.getElementById('mCerrar').onclick =
+      document.getElementById('resModalClose').onclick = () => {
+        document.getElementById('resModal').style.display = 'none';
+      };
+    }
+
     // ✅ Una vez que el HTML fue insertado, seteamos la fecha y ejecutamos la búsqueda
     setTimeout(() => {
       const fechaInput = document.getElementById('buscarFecha');
@@ -1701,6 +1786,82 @@ z-index: 9999; background: white; padding: 24px; border: 3px solid black; max-wi
     
       buscarResultados();
     }, 10);
+
+    // ==============================
+// TABLERO RESULTADOS DEL DÍA (VENDEDOR)
+// ==============================
+contenido.insertAdjacentHTML('beforeend', `
+  <div style="
+    margin-top:40px;
+    background:#0b0b0b;
+    border:1px solid #333;
+    border-radius:12px;
+    padding:14px;
+  ">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <h2 style="margin:0;color:#fff;font-size:20px">📊 Resultados del día</h2>
+
+      <input
+        type="date"
+        id="vend_tab_fecha"
+        style="
+          margin-left:auto;
+          width:120px;
+          padding:4px 6px;
+          border-radius:6px;
+          background:#111;
+          color:#fff;
+          border:1px solid #444;
+          font-size:13px;
+        "
+      >
+
+      <button
+        id="vend_tab_refrescar"
+        style="
+          padding:5px 10px;
+          border-radius:6px;
+          border:none;
+          background:#2ecc71;
+          color:#000;
+          font-weight:700;
+          font-size:13px;
+          cursor:pointer;
+        "
+      >
+        Actualizar
+      </button>
+    </div>
+
+    <div
+      id="vend_tablero"
+      style="
+        display:grid;
+        gap:6px;
+        overflow:auto;
+      "
+    ></div>
+
+    <div id="vend_tab_msg" style="margin-top:8px;color:#9ad;font-size:13px"></div>
+  </div>
+`);
+function hoyArgentinaISO() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+}
+setTimeout(() => {
+  const f = document.getElementById('vend_tab_fecha');
+  const b = document.getElementById('vend_tab_refrescar');
+
+  if (f) f.value = hoyArgentinaISO();
+  if (b) b.onclick = cargarTableroResultadosVendedor;
+
+  cargarTableroResultadosVendedor();
+}, 50);
 
     break;
 
@@ -3447,6 +3608,13 @@ for (let i = 0; i < inputs.length; i++) {
     const redobloNum = val(3);
     const redobloPos = val(4);
 
+    // ⚡ ATAJO: si estamos en Número Redoblona vacío → crear jugada y volver al inicio
+    if (i === 3 && !redobloNum && !redobloPos) {
+      document.querySelector('.btn-jugar')?.click();
+      inputs[0].focus();
+      return;
+    }
+
     if (i === 3 && redobloNum && !redobloPos) {
       inputs[4].focus();
       return;
@@ -4885,5 +5053,267 @@ function desactivarDividirMonto() {
       }
       return result;
     };
+  });
+})();
+async function cargarTableroResultadosVendedor() {
+  const fecha =
+    document.getElementById('vend_tab_fecha')?.value || hoyArgentinaISO();
+
+  const lotCfg = JSON.parse(localStorage.getItem('loteriasConfig') || '[]');
+  const NOMBRES = new Map(lotCfg.map(l => [l.sigla, l.nombre]));
+  const HORARIOSx = new Map(lotCfg.map(l => [l.sigla, new Set(l.horarios)]));
+  const FILAS = lotCfg.map(l => l.sigla);
+
+  const HORAS = [...new Set(lotCfg.flatMap(l => l.horarios))].sort((a, b) => {
+    const [h1, m1] = a.split(':').map(Number);
+    const [h2, m2] = b.split(':').map(Number);
+    return h1 - h2 || m1 - m2;
+  });
+
+  const msg = document.getElementById('vend_tab_msg');
+  const cont = document.getElementById('vend_tablero');
+  if (!cont) return;
+
+  msg.textContent = 'Cargando…';
+
+  // 🔹 MISMA QUERY QUE ADMIN
+  const { data, error } = await supabase
+    .from('resultados')
+    .select('id, loteria, horario, posiciones')
+    .eq('fecha', fecha)
+    .order('id', { ascending: true });
+
+  if (error) {
+    console.error(error);
+    msg.textContent = 'Error cargando resultados';
+    return;
+  }
+
+  const idx = new Map();
+  (data || []).forEach(r =>
+    idx.set(`${r.loteria}__${r.horario}`, r)
+  );
+
+  // Header
+  let html = `<div></div>${HORAS.map(h =>
+    `<div style="text-align:center;color:#bbb;font-weight:700">${h}</div>`
+  ).join('')}`;
+
+  // Filas
+  FILAS.forEach((sig, filaIdx) => {
+    const nombre = NOMBRES.get(sig) || sig;
+    const bg = filaIdx % 2 === 0 ? '#0e0e0e' : '#0b0b0b';
+
+    html += `
+      <div style="
+        color:#fff;
+        font-weight:700;
+        border:1px solid #333;
+        border-radius:8px;
+        padding:8px;
+        background:${bg}
+      ">
+        ${nombre}
+      </div>
+    `;
+
+    HORAS.forEach(h => {
+      const habilitada = HORARIOSx.get(sig)?.has(h);
+      if (!habilitada) {
+        html += `
+          <div style="
+            text-align:center;
+            border:1px dashed #333;
+            border-radius:8px;
+            padding:8px;
+            background:${bg};
+            color:#ff5555;
+            font-weight:900
+          ">
+            ✖
+          </div>
+        `;
+        return;
+      }
+
+      const row = idx.get(`${sig}__${h}`);
+      if (row?.posiciones?.length) {
+        const cabeza = row.posiciones[0]; // 👈 NUMERO REAL
+        html += `
+          <div
+            class="vend-celda-res"
+            data-sig="${sig}"
+            data-h="${h}"
+            style="
+              cursor:pointer;
+              text-align:center;
+              border:1px solid #333;
+              border-radius:8px;
+              padding:8px;
+              background:${bg};
+              color:#ffd86b;
+              font-weight:900;
+              font-size:15px
+            "
+          >
+            ${cabeza}
+          </div>
+        `;
+      } else {
+        html += `
+          <div style="
+            text-align:center;
+            border:1px dashed #333;
+            border-radius:8px;
+            padding:8px;
+            color:#666;
+            background:${bg}
+          ">
+            —
+          </div>
+        `;
+      }
+    });
+  });
+
+  // 🔧 FIX VISUAL: definir columnas del grid (nombre + horarios)
+cont.style.display = 'grid';
+cont.style.gridTemplateColumns = `160px repeat(${HORAS.length}, minmax(70px, 1fr))`;
+cont.style.gap = '8px';
+
+  cont.innerHTML = html;
+  msg.textContent = '';
+
+  // 🔹 MODAL (MISMA UX ADMIN)
+  cont.querySelectorAll('.vend-celda-res').forEach(el => {
+    el.onclick = () => {
+      const sig = el.dataset.sig;
+      const h = el.dataset.h;
+      const row = idx.get(`${sig}__${h}`);
+      if (!row?.posiciones) return;
+
+      const nombre = NOMBRES.get(sig) || sig;
+      document.getElementById('mTitulo').textContent =
+        `${nombre} ${h} — ${fecha}`;
+
+      const lista = row.posiciones;
+      const col1 = lista.slice(0, 10);
+      const col2 = lista.slice(10, 20);
+
+      const mLista = document.getElementById('mLista');
+      mLista.style.display = 'grid';
+      mLista.style.gridTemplateColumns = '1fr 1fr';
+      mLista.style.columnGap = '28px';
+      mLista.style.rowGap = '12px';
+      mLista.style.fontSize = '1.2em';
+
+      mLista.innerHTML = `
+        <div>
+          ${col1.map((n, i) => `
+            <div style="display:flex;gap:12px;align-items:center">
+              <div style="width:38px;text-align:right;color:#bbb">
+                ${String(i+1).padStart(2,'0')}.
+              </div>
+              <div style="flex:1;text-align:center;border:1px solid #333;
+                border-radius:8px;padding:12px;background:#101010;color:#fff">
+                ${n}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div>
+          ${col2.map((n, i) => `
+            <div style="display:flex;gap:12px;align-items:center">
+              <div style="width:38px;text-align:right;color:#bbb">
+                ${String(i+11).padStart(2,'0')}.
+              </div>
+              <div style="flex:1;text-align:center;border:1px solid #333;
+                border-radius:8px;padding:12px;background:#101010;color:#fff">
+                ${n}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      document.getElementById('resModal').style.display = 'grid';
+    };
+  });
+}
+async function abrirModalResultadoVendedor(idResultado) {
+  const { data, error } = await supabase
+    .from('resultados_detalle')
+    .select('posicion, numero')
+    .eq('resultado_id', idResultado)
+    .order('posicion');
+
+  if (error || !data) {
+    alert('No se pudieron cargar los números');
+    return;
+  }
+
+  const modal = document.getElementById('modalTicket');
+  modal.style.display = 'block';
+  modal.innerHTML = `
+    <h3 style="margin-top:0">🎯 Números ganadores</h3>
+
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:10px">
+      ${data.map(n => `
+        <div style="border:1px solid #000;padding:6px;font-size:14px">
+          ${String(n.posicion).padStart(2,'0')} → <b>${n.numero}</b>
+        </div>
+      `).join('')}
+    </div>
+
+    <div style="text-align:center;margin-top:14px">
+      <button onclick="document.getElementById('modalTicket').style.display='none'">
+        Cerrar
+      </button>
+    </div>
+  `;
+}
+// ===============================
+// DRAG MODAL RESULTADOS
+// ===============================
+(function activarDragModalResultados() {
+  let dragging = false;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  document.addEventListener('mousedown', (e) => {
+    const drag = document.getElementById('resModalDrag');
+    const box  = document.getElementById('resModalBox');
+
+    if (!drag || !box) return;
+    if (e.target !== drag) return;
+
+    dragging = true;
+    const rect = box.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+
+    box.style.position = 'fixed';
+    box.style.margin = '0';
+    box.style.left = rect.left + 'px';
+    box.style.top  = rect.top  + 'px';
+
+    drag.style.cursor = 'grabbing';
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const box = document.getElementById('resModalBox');
+    if (!box) return;
+
+    box.style.left = (e.clientX - offsetX) + 'px';
+    box.style.top  = (e.clientY - offsetY) + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+
+    const drag = document.getElementById('resModalDrag');
+    if (drag) drag.style.cursor = 'grab';
   });
 })();
