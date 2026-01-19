@@ -1,3 +1,114 @@
+// ✅ CONFIG DEFAULT EMBEBIDA (para que en GitHub / cualquier PC funcione aunque localStorage esté vacío)
+const LOTERIAS_CONFIG_DEFAULT = [
+  {
+    "nombre": "Nacional",
+    "sigla": "NAC",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Provincia",
+    "sigla": "PRO",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Santa Fe",
+    "sigla": "SFE",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Cordoba",
+    "sigla": "COR",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Entre Rios",
+    "sigla": "RIO",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Corrientes",
+    "sigla": "CTE",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Mendoza",
+    "sigla": "MZA",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Chaco",
+    "sigla": "CHA",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Jujuy",
+    "sigla": "JUJ",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "San Luis",
+    "sigla": "SAN",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Neuquén",
+    "sigla": "NQN",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Chubut",
+    "sigla": "CHB",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Río Negro",
+    "sigla": "RIN",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "La Rioja",
+    "sigla": "LRJ",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Salta",
+    "sigla": "SAL",
+    "horarios": ["12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Misiones",
+    "sigla": "MIS",
+    "horarios": ["10:15","12:00","15:00","18:00","21:00"]
+  },
+  {
+    "nombre": "Santa Cruz",
+    "sigla": "SCR",
+    "horarios": ["12:00","14:30","18:00","21:00"]
+  },
+  {
+    "nombre": "Tucumán",
+    "sigla": "TUC",
+    "horarios": ["11:30","14:30","17:30","19:30","21:00"]
+  },
+  {
+    "nombre": "Santiago del Estero",
+    "sigla": "SGO",
+    "horarios": ["10:15","12:00","15:00","19:30","21:00"]
+  },
+  {
+    "nombre": "Montevideo",
+    "sigla": "ORO",
+    "horarios": ["15:00","21:00"]
+  }
+];
+
+function getLoteriasConfigSeguro() {
+  try {
+    const ls = JSON.parse(localStorage.getItem('loteriasConfig') || 'null');
+    if (Array.isArray(ls) && ls.length) return ls;
+  } catch (e) {}
+  return LOTERIAS_CONFIG_DEFAULT;
+}
 function convertirAHoraMinutos(horaStr) {
   const [h, m] = horaStr.split(":").map(Number);
   return h * 60 + m;
@@ -5059,7 +5170,7 @@ async function cargarTableroResultadosVendedor() {
   const fecha =
     document.getElementById('vend_tab_fecha')?.value || hoyArgentinaISO();
 
-  const lotCfg = JSON.parse(localStorage.getItem('loteriasConfig') || '[]');
+  const lotCfg = getLoteriasConfigSeguro();
   const NOMBRES = new Map(lotCfg.map(l => [l.sigla, l.nombre]));
   const HORARIOSx = new Map(lotCfg.map(l => [l.sigla, new Set(l.horarios)]));
   const FILAS = lotCfg.map(l => l.sigla);
